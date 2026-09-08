@@ -82,32 +82,24 @@ View PlaybackControls(MediaPlayer player) {
   const float position = std::clamp(
       seek_draft.Get().value_or(static_cast<float>(state.progress.position.count())), 0.0F, duration);
 
-  View seek_confirmation = Column {};
-  if (can_seek && seek_draft.Get()) {
-    seek_confirmation = Row {
-      Text("Seek to " + TimeLabel(MediaTime(position)), TextRole::Label)
-          .With(Grow(), Foreground(colors.on_surface_variant)),
-      SecondaryAction(Button("Apply").OnClick([player, seek_draft] {
-        if (seek_draft.Get()) static_cast<void>(player.SeekTo(MediaTime(*seek_draft.Get())));
-        seek_draft = std::optional<float>{};
-      })),
-      IconButton(app::images::close, "Cancel seek")
-          .OnClick([seek_draft] { seek_draft = std::optional<float>{}; }),
-    }.With(Spacing(8.0F), CrossAlign(CrossAxisAlignment::Center));
-  }
-
   return Column {
     Row {
       Text(state.is_seeking ? "Seeking..." : state.is_buffering ? "Buffering..." : StatusLabel(state.status), TextRole::Label)
           .With(Foreground(colors.primary)),
       Spacer(),
-      Text(TimeLabel(state.progress.position) + " / "
+      Text(TimeLabel(seek_draft.Get() ? MediaTime(position) : state.progress.position) + " / "
           + (state.progress.duration ? TimeLabel(*state.progress.duration) : "--:--"), TextRole::Label)
           .With(Foreground(colors.on_surface_variant)),
     }.With(Spacing(8.0F), CrossAlign(CrossAxisAlignment::Center)),
     Slider(position)
         .Range(0.0F, duration)
+        .OnStarted([seek_draft](float value) { seek_draft = value; })
         .OnChanged([seek_draft](float value) { seek_draft = value; })
+        .OnCommitted([player, seek_draft](float value) {
+          static_cast<void>(player.SeekTo(MediaTime(value)));
+          seek_draft = std::optional<float>{};
+        })
+        .OnCanceled([seek_draft] { seek_draft = std::optional<float>{}; })
         .With(Enabled{can_seek}, Semantics{.label = "Playback position"}),
     Row {
       TransportButton(app::images::rewind, "Back 10 seconds", can_seek, false, [player, seek_draft] {
@@ -127,7 +119,6 @@ View PlaybackControls(MediaPlayer player) {
         seek_draft = std::optional<float>{};
       }),
     }.With(Spacing(24.0F), CrossAlign(CrossAxisAlignment::Center), MainAlign(MainAxisAlignment::Center)),
-    seek_confirmation,
     Divider(),
     Flow {
       Chip(app::images::repeat, "Repeat", state.looping)

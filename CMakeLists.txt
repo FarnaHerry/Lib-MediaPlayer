@@ -7,16 +7,6 @@ if (HUXERUI_PROJECT_PLAN_ONLY)
     return()
 endif ()
 
-if (HUXERUI_LIBRARY_GRAPH_ONLY)
-    add_library(huxerui_mediaplayer INTERFACE)
-    set_target_properties(huxerui_mediaplayer PROPERTIES
-            HUXERUI_LIBRARY TRUE
-            HUXERUI_LIBRARY_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-    add_library(HuxerUI::MediaPlayer ALIAS huxerui_mediaplayer)
-    return()
-endif ()
-
 file(GLOB_RECURSE LIBRARY_SOURCE_FILES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
@@ -76,6 +66,12 @@ huxerui_add_library(huxerui_mediaplayer
             media
 )
 
+add_library(HuxerUI::MediaPlayer ALIAS huxerui_mediaplayer)
+
+if (HUXERUI_LIBRARY_GRAPH_ONLY)
+    return()
+endif ()
+
 target_include_directories(huxerui_mediaplayer PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>"
@@ -110,5 +106,3 @@ if (HUXERUI_MEDIAPLAYER_BUILD_TESTS AND NOT HUXERUI_LIBRARY_GRAPH_ONLY)
     enable_testing()
     add_subdirectory(tests)
 endif ()
-
-add_library(HuxerUI::MediaPlayer ALIAS huxerui_mediaplayer)
