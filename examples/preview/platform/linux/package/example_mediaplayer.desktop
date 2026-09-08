@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=MediaPlayer Preview
+Exec=example_mediaplayer
+Icon=example_mediaplayer
+Categories=Utility;
+Terminal=false

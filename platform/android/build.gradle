@@ -1,0 +1,27 @@
+plugins {
+    id "com.android.library"
+}
+
+dependencies {
+    if (rootProject.gradle.ext.huxeruiUsesSource) {
+        compileOnly project(":HuxerUI")
+    } else {
+        compileOnly files(rootProject.gradle.ext.huxeruiAndroidArchive)
+    }
+    implementation "androidx.media3:media3-exoplayer:1.9.3"
+}
+
+android {
+    namespace = "org.huxerui.lib.mediaplayer"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 23
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+}
