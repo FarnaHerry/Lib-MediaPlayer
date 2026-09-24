@@ -43,8 +43,8 @@ struct WebVideo {
 
 } // namespace
 
-void InstallPlatform(RootContext& root) {
-  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, [](PlatformAdapter& adapter) {
+void InstallPlatform(ApplicationContext& root) {
+  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, [](UiWindow& adapter) {
     auto bundle = val::module_property("createMediaPlayerBundle")();
     web::JavaScriptPlatformModuleFactory<std::shared_ptr<NativePlayer>> factory{
         .factory = bundle["factory"],

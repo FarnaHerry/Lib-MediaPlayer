@@ -528,7 +528,7 @@ MediaPlayer UseMediaPlayer() {
   return detail::PlayerAccess::Create(std::move(state));
 }
 
-void Install(RootContext& root) {
+void Install(ApplicationContext& root) {
   detail::InstallPlatform(root);
 }
 

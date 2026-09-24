@@ -345,7 +345,7 @@ const Application application{
             .title = "MediaPlayer Preview",
             .initial_size = {1040.0F, 900.0F},
         },
-        .root_hooks = {
+        .application_hooks = {
             huxerui::media::Install,
         },
     }
