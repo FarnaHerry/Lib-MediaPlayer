@@ -11,7 +11,9 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
+import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
 import org.huxerui.HuxerUIFileReference;
 import org.huxerui.HuxerUIPlatformChannel;
@@ -27,6 +29,20 @@ import java.util.Map;
 
 public final class NativeMediaPlayer implements HuxerUIPlatformModule {
     private static final Map<Long, WeakReference<NativeMediaPlayer>> sessions = new HashMap<>();
+
+    /**
+     * 网络媒体的 HTTP 参数。
+     *
+     * 默认的 `ExoPlayer.Builder(context)` 用的是一把「裸」的 DefaultHttpDataSource：
+     *   * User-Agent 是 ExoPlayer 自己的默认串（有的 CDN 会按 UA 拦）；
+     *   * **跨协议重定向是关的**（`allowCrossProtocolRedirects=false`）—— CDN 把 https 302 到
+     *     另一个主机/协议时就整条放不出来，报的正是「could not play the source」；
+     *   * 连接/读取超时都是 8 秒，弱网下很容易被判失败。
+     * 这里把三条都配好（超时放宽到 15s/20s），直连才真的可用。
+     */
+    private static final String USER_AGENT = "acgu-media/1.0 (Android)";
+    private static final int CONNECT_TIMEOUT_MS = 15_000;
+    private static final int READ_TIMEOUT_MS = 20_000;
     private final Context context;
     private final HuxerUIPlatformChannel.Events events;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -150,8 +166,16 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
         } else {
             uri = Uri.parse(args.requireField("value").requireString());
         }
-        final ExoPlayer current = new ExoPlayer.Builder(context).build();
+        final DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
+                .setUserAgent(USER_AGENT)
+                .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
+                .setReadTimeoutMs(READ_TIMEOUT_MS)
+                .setAllowCrossProtocolRedirects(true);
+        final ExoPlayer current =
+                new ExoPlayer.Builder(context, new DefaultMediaSourceFactory(http)).build();
         player = current;
+        // 息屏/后台继续放：ExoPlayer 会自己申请唤醒锁（应用侧已声明 WAKE_LOCK 权限）。
+        current.setWakeMode(C.WAKE_MODE_NETWORK);
         current.setAudioAttributes(new AudioAttributes.Builder()
                                            .setUsage(C.USAGE_MEDIA)
                                            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
