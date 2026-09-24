@@ -148,6 +148,14 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
         } catch (RuntimeException exception) {
             error("output", "The native media command failed", exception.getClass().getSimpleName(), true);
             result.complete(PlatformPayload.nullValue());
+        } catch (Throwable failure) {
+            // **连 Error 也接住**：媒体引擎那侧出 `NoClassDefFoundError` / `LinkageError` 这类
+            // `Error` 时，原来的代码只接 RuntimeException，异常会穿过 JNI 边界把整个进程带走 ——
+            // 用户看到的就是「点开视频直接闪退、日志什么都没有」。现在把它变成一条带类名与消息的
+            // 错误事件（界面显示「播放失败」并写日志），至少能定位、且不会闪退。
+            error("engine", "The media engine failed: " + failure,
+                    failure.getClass().getName(), true);
+            result.complete(PlatformPayload.nullValue());
         }
         return null;
     }
