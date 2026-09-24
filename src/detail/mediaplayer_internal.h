@@ -116,7 +116,7 @@ struct PlayerAccess {
   }
 };
 
-void InstallPlatform(RootContext& root);
+void InstallPlatform(ApplicationContext& root);
 void ValidateVideoProperties(const VideoSurfaceProperties& properties);
 
 } // namespace huxerui::media::detail

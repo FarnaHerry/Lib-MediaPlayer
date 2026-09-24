@@ -4,7 +4,7 @@
 
 namespace huxerui::media::detail {
 
-void InstallPlatform(RootContext& root) {
+void InstallPlatform(ApplicationContext& root) {
   android::JavaPlatformModuleFactory<std::shared_ptr<NativePlayer>> module;
   module.class_name = "org.huxerui.lib.mediaplayer.NativeMediaPlayer$Factory";
   module.create = [](PlatformChannel channel) -> std::shared_ptr<NativePlayer> {

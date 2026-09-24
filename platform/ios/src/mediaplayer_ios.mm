@@ -372,9 +372,9 @@ struct IOSVideo {
 
 } // namespace
 
-void InstallPlatform(RootContext &root) {
+void InstallPlatform(ApplicationContext &root) {
   root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(
-      player_type, [](PlatformAdapter &) -> std::shared_ptr<NativePlayer> {
+      player_type, [](UiWindow &) -> std::shared_ptr<NativePlayer> {
         return std::make_shared<IOSPlayer>();
       });
   ios::PlatformViewFactory<VideoSurfaceProperties, IOSVideo, MediaPlayer>
