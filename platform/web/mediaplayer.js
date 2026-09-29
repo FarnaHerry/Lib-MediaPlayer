@@ -14,6 +14,8 @@
         this.objectUrl = null;
         this.volume = 1;
         this.muted = false;
+        // 预取预算（秒）：Web 端没有可配置的实现，只是记下来（见 invoke 里的 bufferBudget）。
+        this.bufferBudgetSeconds = 0;
         this.buffering = false;
         this.ready = false;
         this.disposed = false;
@@ -166,7 +168,7 @@
 
       invoke(method, args, result) {
         if (this.disposed) { result.fail("media/disposed", "Media session is disposed", P.nullValue()); return; }
-        if (!["initialize", "load", "volume"].includes(method) && args.requireField("generation").requireInt64() !== this.generation) {
+        if (!["initialize", "load", "volume", "bufferBudget"].includes(method) && args.requireField("generation").requireInt64() !== this.generation) {
           result.complete(P.nullValue());
           return;
         }
@@ -186,6 +188,11 @@
             this.volume = args.requireField("volume").requireDouble();
             this.muted = args.requireField("muted").requireBoolean();
             if (this.video) { this.video.volume = this.volume; this.video.muted = this.muted; }
+            break;
+          case "bufferBudget":
+            // Web 端的 <video> 没有可配置的预取预算：**接受并忽略**（语义与 NativePlayer 的默认
+            // 实现一致，见 mediaplayer.h 的 SetBufferBudget）。读一下字段是为了照样校验载荷形状。
+            this.bufferBudgetSeconds = args.requireField("seconds").requireDouble();
             break;
           case "poll": if (this.ready) this.send("update"); break;
           case "seek":

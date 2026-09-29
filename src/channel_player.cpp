@@ -119,6 +119,10 @@ void ChannelPlayer::Seek(MediaTime position, std::uint64_t seek_id) {
 void ChannelPlayer::SetVolume(double volume, bool muted) {
   Invoke("volume", {{"volume", volume}, {"muted", muted}});
 }
+void ChannelPlayer::SetBufferBudget(MediaTime budget) {
+  // 平台侧把它换算成微秒喂给 ExoPlayer 的 LoadControl（0 = 用后端默认，不额外限制）。
+  Invoke("bufferBudget", {{"seconds", budget.count()}});
+}
 void ChannelPlayer::Poll() {
   Invoke("poll");
 }
