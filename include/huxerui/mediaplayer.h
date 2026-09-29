@@ -310,6 +310,21 @@ public:
   /// @throws std::logic_error If called from a different thread.
   [[nodiscard]] bool SetMuted(bool muted) const;
 
+  /// @brief Caps how much media this session prefetches ahead, in seconds.
+  ///
+  /// The backend default keeps a large lookahead (the Android adapter's `DefaultLoadControl` targets roughly
+  /// 50 seconds of media), which is right for the session the user is watching and wrong for a session that is
+  /// only being kept warm: a **paused** preview still pulls that whole lookahead, and on a phone that bandwidth
+  /// is taken from the video actually playing. Give such sessions a small budget and release it when the session
+  /// is promoted to the foreground.
+  ///
+  /// @param budget Maximum lookahead in seconds; `MediaTime{0.0}` restores the backend default (no extra cap).
+  /// @return True if connected and accepted; false if disconnected. The preference survives Load() and Clear().
+  /// @throws std::invalid_argument If budget is negative or nonfinite, even when disconnected.
+  /// @throws std::logic_error If called from a different thread.
+  /// @note Backends without a configurable prefetch budget accept the call and ignore it (see NativePlayer).
+  [[nodiscard]] bool SetBufferBudget(MediaTime budget) const;
+
   /// @brief Subscribes to progress for the declaring composition lifetime.
   ///
   /// Delivers an initial snapshot when connected, then progress from native polling about every 250 ms and significant

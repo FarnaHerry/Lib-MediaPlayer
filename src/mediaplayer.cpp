@@ -35,6 +35,8 @@ void PlayerState::Attach(std::shared_ptr<NativePlayer> value_native) {
     });
   };
   native->SetVolume(value.volume, value.muted);
+  // 预算也要在每次挂上时重新应用（会话级偏好，见 MediaPlayer::SetBufferBudget）。
+  native->SetBufferBudget(buffer_budget);
   if (video_binding_)
     video_binding_(native);
   Publish(true);
@@ -455,6 +457,20 @@ bool MediaPlayer::SetMuted(bool muted) const {
   state_->value.muted = muted;
   state_->native->SetVolume(state_->value.volume, muted);
   state_->Publish();
+  return true;
+}
+
+bool MediaPlayer::SetBufferBudget(MediaTime budget) const {
+  state_->CheckThread();
+  const double seconds = budget.count();
+  if (!std::isfinite(seconds) || seconds < 0)
+    throw std::invalid_argument("HuxerUI media buffer budget must be finite and non-negative");
+  // **先存偏好、再谈连接**：预算跟音量/循环一样跨 Load/Clear 保留，而且在 `Attach` 时会重新应用
+  //（后端每次 Load 都可能换一个 player 实例，预算必须跟着走过去）。
+  state_->buffer_budget = budget;
+  if (!IsConnected())
+    return false;
+  state_->native->SetBufferBudget(budget);
   return true;
 }
 

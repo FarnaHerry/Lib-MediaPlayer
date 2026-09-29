@@ -16,6 +16,7 @@ public:
   void Pause() override;
   void Seek(MediaTime position, std::uint64_t seek_id) override;
   void SetVolume(double volume, bool muted) override;
+  void SetBufferBudget(MediaTime budget) override;
   void Poll() override;
   void BindVideo(PlatformChannel video) override;
   void UnbindVideo() override;

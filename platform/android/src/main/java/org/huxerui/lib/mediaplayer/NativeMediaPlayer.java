@@ -53,6 +53,9 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
     private boolean disposed;
     private double volume = 1;
     private boolean muted;
+    /** 会话级偏好：最多预取多少秒（0 = 用 ExoPlayer 默认）。见 {@link BudgetLoadControl}。 */
+    private double bufferBudgetSeconds;
+    private BudgetLoadControl loadControl;
     private HuxerUIFileReference reference;
     ExoPlayer player;
     NativeVideoSurface surface;
@@ -86,6 +89,7 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
         }
         long commandGeneration = args.requireField("generation").requireInt64();
         if (!method.equals("initialize") && !method.equals("load") && !method.equals("volume")
+                && !method.equals("bufferBudget")
                 && commandGeneration != generation) {
             result.complete(PlatformPayload.nullValue());
             return null;
@@ -134,6 +138,12 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
                     if (player != null)
                         player.setVolume(muted ? 0 : (float) volume);
                     break;
+                case "bufferBudget":
+                    // 会话级偏好：改的是预算，不影响已经缓冲到的内容。
+                    bufferBudgetSeconds = args.requireField("seconds").requireDouble();
+                    if (loadControl != null)
+                        loadControl.setBudgetUs(secondsToMicros(bufferBudgetSeconds));
+                    break;
                 case "poll":
                     if (ready)
                         send("update");
@@ -179,9 +189,15 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
                 .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
                 .setReadTimeoutMs(READ_TIMEOUT_MS)
                 .setAllowCrossProtocolRedirects(true);
+        // 每次 load 都会新建一个 ExoPlayer，所以 LoadControl 也每次新建 —— 预算作为会话级偏好留在
+        // 本对象上（见 bufferBudgetSeconds 与 "bufferBudget" 命令），新 player 直接继承它。
+        final BudgetLoadControl control = new BudgetLoadControl(secondsToMicros(bufferBudgetSeconds));
         final ExoPlayer current =
-                new ExoPlayer.Builder(context, new DefaultMediaSourceFactory(http)).build();
+                new ExoPlayer.Builder(context, new DefaultMediaSourceFactory(http))
+                        .setLoadControl(control)
+                        .build();
         player = current;
+        loadControl = control;
         // 息屏/后台继续放：ExoPlayer 会自己申请唤醒锁（应用侧已声明 WAKE_LOCK 权限）。
         current.setWakeMode(C.WAKE_MODE_NETWORK);
         current.setAudioAttributes(new AudioAttributes.Builder()
@@ -329,6 +345,14 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
         fields.put("platformCode", PlatformPayload.string(platformCode));
         fields.put("fatal", PlatformPayload.booleanValue(fatal));
         events.emit("media", PlatformPayload.object(fields));
+    }
+
+    /** 秒 → 微秒（ExoPlayer 的 LoadControl 用微秒）。非正数一律当「不额外限制」。 */
+    private static long secondsToMicros(double seconds) {
+        if (!(seconds > 0))
+            return 0L;
+        final double micros = seconds * 1_000_000.0;
+        return micros >= Long.MAX_VALUE ? Long.MAX_VALUE : (long) micros;
     }
 
     private void clear() {

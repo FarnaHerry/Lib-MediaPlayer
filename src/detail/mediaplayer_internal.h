@@ -44,6 +44,9 @@ public:
   virtual void Pause() = 0;
   virtual void Seek(MediaTime position, std::uint64_t seek_id) = 0;
   virtual void SetVolume(double volume, bool muted) = 0;
+  /// 「最多预取多少秒」的会话级偏好（2026-09-29）。默认空实现：只有能配置预取预算的后端才照办
+  /// （Android / ExoPlayer 那套）。`MediaTime{0.0}` = 用后端默认。
+  virtual void SetBufferBudget(MediaTime) {}
   virtual void Poll() = 0;
   virtual void BindVideo(PlatformChannel) {}
   virtual void UnbindVideo() {}
@@ -77,6 +80,9 @@ public:
   State<std::shared_ptr<ExternalTexture>> observed_texture;
   std::shared_ptr<NativePlayer> native;
   std::optional<MediaSource> source;
+  /// 会话级偏好：最多预取多少秒（`MediaTime{0.0}` = 后端默认）。跟音量/循环一样跨 Load/Clear 保留，
+  /// 并在 `Attach` 时重新应用（后端每次 Load 可能换一个 player 实例）。
+  MediaTime buffer_budget{0.0};
   std::uint64_t generation = 0;
   std::uint64_t attachment = 0;
   std::uint64_t seek_serial = 0;
