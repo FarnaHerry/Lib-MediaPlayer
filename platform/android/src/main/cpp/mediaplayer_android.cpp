@@ -5,6 +5,10 @@
 namespace huxerui::media::detail {
 
 void InstallPlatform(ApplicationContext& root) {
+  android::JavaPlatformModuleFactory<std::shared_ptr<PlatformChannel>> cache;
+  cache.class_name = "org.huxerui.lib.mediaplayer.NativeHttpCache$Factory";
+  cache.create = [](PlatformChannel channel) { return std::make_shared<PlatformChannel>(std::move(channel)); };
+  root.RegisterPlatformModule<std::shared_ptr<PlatformChannel>>("media/HttpCache", std::move(cache));
   android::JavaPlatformModuleFactory<std::shared_ptr<NativePlayer>> module;
   module.class_name = "org.huxerui.lib.mediaplayer.NativeMediaPlayer$Factory";
   module.create = [](PlatformChannel channel) -> std::shared_ptr<NativePlayer> {
@@ -32,3 +36,12 @@ void InstallPlatform(ApplicationContext& root) {
 }
 
 } // namespace huxerui::media::detail
+
+namespace huxerui::media {
+void ClearHttpCache(std::string directory) {
+  const auto channel = OpenPlatformModule<std::shared_ptr<PlatformChannel>>("media/HttpCache");
+  if (!channel) return;
+  static_cast<void>(channel->Invoke("clear", PlatformPayload(std::move(directory)),
+      [channel](PlatformResult<PlatformPayload>) {}));
+}
+} // namespace huxerui::media

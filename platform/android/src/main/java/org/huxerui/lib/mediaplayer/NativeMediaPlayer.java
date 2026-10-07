@@ -12,6 +12,8 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.DataSource;
+import androidx.media3.datasource.cache.CacheDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
@@ -43,6 +45,11 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
     private static final String USER_AGENT = "acgu-media/1.0 (Android)";
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 20_000;
+    private static final AudioAttributes AUDIO_ATTRIBUTES =
+            new AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build();
     private final Context context;
     private final HuxerUIPlatformChannel.Events events;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -56,6 +63,7 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
     /** 会话级偏好：最多预取多少秒（0 = 用 ExoPlayer 默认）。见 {@link BudgetLoadControl}。 */
     private double bufferBudgetSeconds;
     private BudgetLoadControl loadControl;
+    private NativeHttpCache.Entry httpCache;
     private HuxerUIFileReference reference;
     ExoPlayer player;
     NativeVideoSurface surface;
@@ -134,9 +142,18 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
                     break;
                 case "volume":
                     volume = args.requireField("volume").requireDouble();
+                    final boolean wasMuted = muted;
                     muted = args.requireField("muted").requireBoolean();
-                    if (player != null)
+                    if (player != null) {
+                        // 预览虽然音量为 0，ExoPlayer 仍会在 play() 时申请音频焦点；催首帧会
+                        // 使正在看的主视频收到 AUDIO_FOCUS_LOSS 并停住。静音角色不管理焦点，
+                        // 晋升为有声主会话时再开启；只在角色变化时重配，避免每次音量更新重建音轨。
+                        if (wasMuted != muted) {
+                            player.setAudioAttributes(AUDIO_ATTRIBUTES, !muted);
+                            player.setHandleAudioBecomingNoisy(!muted);
+                        }
                         player.setVolume(muted ? 0 : (float) volume);
+                    }
                     break;
                 case "bufferBudget":
                     // 会话级偏好：改的是预算，不影响已经缓冲到的内容。
@@ -189,23 +206,33 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
                 .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
                 .setReadTimeoutMs(READ_TIMEOUT_MS)
                 .setAllowCrossProtocolRedirects(true);
+        DataSource.Factory sourceFactory = http;
+        if (args.requireField("kind").requireString().equals("http")) {
+            final String directory = args.requireField("cacheDirectory").requireString();
+            if (!directory.isEmpty()) {
+                httpCache = NativeHttpCache.acquire(context, directory,
+                        args.requireField("cacheBudgetBytes").requireInt64());
+                // 不额外预下载：只缓存播放器实际读取的字节，原来的前向预算继续生效。
+                sourceFactory = new CacheDataSource.Factory().setCache(httpCache.cache)
+                        .setUpstreamDataSourceFactory(http)
+                        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
+            }
+        }
         // 每次 load 都会新建一个 ExoPlayer，所以 LoadControl 也每次新建 —— 预算作为会话级偏好留在
         // 本对象上（见 bufferBudgetSeconds 与 "bufferBudget" 命令），新 player 直接继承它。
         final BudgetLoadControl control = new BudgetLoadControl(secondsToMicros(bufferBudgetSeconds));
         final ExoPlayer current =
-                new ExoPlayer.Builder(context, new DefaultMediaSourceFactory(http))
+                new ExoPlayer.Builder(context, new DefaultMediaSourceFactory(sourceFactory))
                         .setLoadControl(control)
                         .build();
         player = current;
         loadControl = control;
         // 息屏/后台继续放：ExoPlayer 会自己申请唤醒锁（应用侧已声明 WAKE_LOCK 权限）。
         current.setWakeMode(C.WAKE_MODE_NETWORK);
-        current.setAudioAttributes(new AudioAttributes.Builder()
-                                           .setUsage(C.USAGE_MEDIA)
-                                           .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                                           .build(),
-                true);
-        current.setHandleAudioBecomingNoisy(true);
+        // 每次 load 都是新 ExoPlayer；预览角色此前 SetMuted(true)，必须在第一次 play 前
+        // 关闭音频焦点管理，否则静音预热也会抢停主视频。
+        current.setAudioAttributes(AUDIO_ATTRIBUTES, !muted);
+        current.setHandleAudioBecomingNoisy(!muted);
         current.setVolume(muted ? 0 : (float) volume);
         current.addListener(new Player.Listener() {
             private boolean valid() {
@@ -246,6 +273,10 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
                         && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS
                                 || reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY))
                     send("interrupted");
+            }
+            @Override
+            public void onRenderedFirstFrame() {
+                if (valid() && surface != null) surface.firstFrameRendered(current);
             }
             @Override
             public void onVideoSizeChanged(VideoSize size) {
@@ -362,8 +393,13 @@ public final class NativeMediaPlayer implements HuxerUIPlatformModule {
         player = null;
         if (surface != null)
             surface.attachPlayer(null);
-        if (previous != null)
-            previous.release();
+        final NativeHttpCache.Entry previousCache = httpCache;
+        httpCache = null;
+        try {
+            if (previous != null) previous.release();
+        } finally {
+            if (previousCache != null) previousCache.close();
+        }
         if (reference != null) {
             reference.close();
             reference = null;

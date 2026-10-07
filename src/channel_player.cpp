@@ -90,6 +90,8 @@ void ChannelPlayer::Load(const MediaSource& source, std::uint64_t generation) {
   if (const auto* http = std::get_if<MediaHttpSource>(&input)) {
     fields.emplace("kind", "http");
     fields.emplace("value", http->url);
+    fields.emplace("cacheDirectory", http->cache_directory);
+    fields.emplace("cacheBudgetBytes", static_cast<std::int64_t>(http->cache_budget_bytes));
     for (const auto& [name, value] : http->headers)
       headers.emplace(name, value);
   } else if (const auto* file = std::get_if<File>(&input)) {

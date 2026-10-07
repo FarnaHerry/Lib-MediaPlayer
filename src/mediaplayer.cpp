@@ -560,3 +560,7 @@ View VideoSurface(MediaPlayer player, VideoSurfaceProperties properties) {
 #endif
 
 } // namespace huxerui::media
+
+#if !defined(__ANDROID__)
+void huxerui::media::ClearHttpCache(std::string) {}
+#endif
