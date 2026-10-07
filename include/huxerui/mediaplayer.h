@@ -52,6 +52,11 @@ struct MediaHttpSource {
   /// Malformed headers are rejected when wrapped in MediaSource. Nonempty headers currently produce an Unsupported
   /// playback error on every adapter when loaded; they are never silently dropped. Use an empty map for native requests.
   std::map<std::string, std::string, std::less<>> headers;
+  /// Optional Android streaming cache, in a dedicated application-owned directory. Empty disables caching.
+  /// Other adapters ignore it. Keep this directory separate from downloaded media files.
+  std::string cache_directory;
+  /// Maximum bytes retained by the Android LRU cache; applies when cache_directory is nonempty.
+  std::uint64_t cache_budget_bytes = 256ull * 1024ull * 1024ull;
 };
 
 /// @brief A retained local file, picker-granted file reference, or HTTP media input.
@@ -493,5 +498,9 @@ huxerui::View VideoSurface(MediaPlayer player, VideoSurfaceProperties properties
 /// };
 /// @endcode
 void Install(huxerui::ApplicationContext& root);
+
+/// Clear cached Android HTTP spans through the cache owner. Other adapters do nothing.
+/// Invoke on the application UI thread after Install; the operation uses the platform command channel.
+void ClearHttpCache(std::string directory);
 
 } // namespace huxerui::media

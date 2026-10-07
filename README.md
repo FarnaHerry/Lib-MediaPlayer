@@ -6,6 +6,15 @@ Native audio and video playback for HuxerUI. The public API is in
 The player owns playback independently of its optional video surface. The library supplies media state and commands;
 applications compose their own controls.
 
+## Android streaming cache (fork)
+
+Set `MediaHttpSource::cache_directory` to a dedicated application-owned directory to cache bytes read during playback.
+`cache_budget_bytes` bounds retained disk data with Media3 LRU eviction (256 MiB by default). Empty disables caching;
+other adapters ignore these fields. Use distinct directories for signed-in users. The Android backend shares one cache
+per directory across live players and releases it after the last source closes; disk spans survive player replacement.
+Call `ClearHttpCache(directory)` on the UI thread to clear spans through their owner and update the index. Do not delete
+active `.exo` files yourself. This cache does not turn a partially watched item into a complete offline download.
+
 ## Integration
 
 Use the current HuxerUI SDK with FileReference-capable platform payloads and the current CLI library project format.
