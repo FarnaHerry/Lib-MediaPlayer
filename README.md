@@ -1,5 +1,7 @@
 # Lib-MediaPlayer
 
+This downstream fork maintains application fixes on `farna/main`, including Android prefetch budgets, muted-preview audio focus, streaming cache ownership and first-frame presentation. The official baseline is tracked through `upstream/main` from `HuxerUI/Lib-MediaPlayer`. Consumers should pin a validated commit and use matching C++ and Android Java revisions.
+
 Native audio and video playback for HuxerUI. The public API is in
 [`huxerui/mediaplayer.h`](include/huxerui/mediaplayer.h), under `huxerui::media`.
 
