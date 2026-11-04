@@ -528,8 +528,8 @@ MediaPlayer UseMediaPlayer() {
   return detail::PlayerAccess::Create(std::move(state));
 }
 
-void Install(RootContext& root) {
-  detail::InstallPlatform(root);
+void Install(ApplicationContext& context) {
+  detail::InstallPlatform(context);
 }
 
 #if !defined(__linux__) || defined(__ANDROID__)

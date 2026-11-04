@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(huxerui_mediaplayer VERSION 0.1.0 LANGUAGES NONE)
+# CMake initializes Apple deployment defaults during the first project() call.
+# Explicit settings and toolchains retain ownership of their target platform.
+if (CMAKE_HOST_APPLE AND (NOT CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        AND NOT CMAKE_TOOLCHAIN_FILE AND "$ENV{CMAKE_TOOLCHAIN_FILE}" STREQUAL ""
+        AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND "$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment target")
+endif ()
+
+project(huxerui_media VERSION 0.1.0 LANGUAGES NONE)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/HuxerUIProject.cmake")
 if (HUXERUI_PROJECT_PLAN_ONLY)
@@ -57,7 +65,7 @@ if (EMSCRIPTEN)
     list(APPEND LIBRARY_SOURCE_FILES ${LIBRARY_WEB_SOURCE_FILES})
 endif ()
 
-huxerui_add_library(huxerui_mediaplayer
+huxerui_add_library(huxerui_media
         SOURCES
             ${LIBRARY_SOURCE_FILES}
         RESOURCES
@@ -66,43 +74,43 @@ huxerui_add_library(huxerui_mediaplayer
             media
 )
 
-add_library(HuxerUI::MediaPlayer ALIAS huxerui_mediaplayer)
+add_library(HuxerUI::Media ALIAS huxerui_media)
 
 if (HUXERUI_LIBRARY_GRAPH_ONLY)
     return()
 endif ()
 
-target_include_directories(huxerui_mediaplayer PUBLIC
+target_include_directories(huxerui_media PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>"
 )
-target_include_directories(huxerui_mediaplayer PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(huxerui_media PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 if (WIN32)
-    target_compile_definitions(huxerui_mediaplayer PRIVATE NOMINMAX UNICODE _UNICODE)
-    target_link_libraries(huxerui_mediaplayer PRIVATE mfplat mfuuid mf d3d11 dxgi oleaut32)
+    target_compile_definitions(huxerui_media PRIVATE NOMINMAX UNICODE _UNICODE)
+    target_link_libraries(huxerui_media PRIVATE mfplat mfuuid mf d3d11 dxgi oleaut32)
 endif ()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(MEDIAPLAYER_GTK REQUIRED IMPORTED_TARGET "gtk4>=4.14")
-    target_link_libraries(huxerui_mediaplayer PRIVATE PkgConfig::MEDIAPLAYER_GTK)
+    pkg_check_modules(MEDIA_GTK REQUIRED IMPORTED_TARGET "gtk4>=4.14")
+    target_link_libraries(huxerui_media PRIVATE PkgConfig::MEDIA_GTK)
 endif ()
 
 if (EMSCRIPTEN)
-    set_property(TARGET huxerui_mediaplayer APPEND PROPERTY INTERFACE_LINK_DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/platform/web/mediaplayer.js")
-    target_link_options(huxerui_mediaplayer INTERFACE
-            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/platform/web/mediaplayer.js\""
+    set_property(TARGET huxerui_media APPEND PROPERTY INTERFACE_LINK_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/platform/web/media.js")
+    target_link_options(huxerui_media INTERFACE
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/platform/web/media.js\""
     )
 endif ()
 
 if (APPLE)
-    target_link_libraries(huxerui_mediaplayer PRIVATE "-framework AVFoundation" "-framework QuartzCore" "-framework CoreMedia")
+    target_link_libraries(huxerui_media PRIVATE "-framework AVFoundation" "-framework QuartzCore" "-framework CoreMedia")
 endif ()
 
-option(HUXERUI_MEDIAPLAYER_BUILD_TESTS "Build MediaPlayer contract tests" OFF)
-if (HUXERUI_MEDIAPLAYER_BUILD_TESTS AND NOT HUXERUI_LIBRARY_GRAPH_ONLY)
+option(HUXERUI_MEDIA_BUILD_TESTS "Build Media contract tests" OFF)
+if (HUXERUI_MEDIA_BUILD_TESTS AND NOT HUXERUI_LIBRARY_GRAPH_ONLY)
     enable_testing()
     add_subdirectory(tests)
 endif ()

@@ -270,7 +270,7 @@ View MediaContent() {
   auto selected = UseState(std::size_t{0});
   const bool compact = UseViewportClass() == ViewportClass::Compact;
   return Column {
-    TopAppBar("MediaPlayer"),
+    TopAppBar("Media"),
     ScrollView(Column {
       Text("HUXERUI / PLAYER PREVIEW", TextRole::Label).With(Foreground(UseTheme().colors.on_surface_variant)),
       Tabs({"Video", "Music"}, selected).OnChanged([selected](std::size_t index) { selected = index; }),
@@ -342,10 +342,10 @@ const Application application{
     App,
     {
         .window = {
-            .title = "MediaPlayer Preview",
+            .title = "Media Preview",
             .initial_size = {1040.0F, 900.0F},
         },
-        .root_hooks = {
+        .application_hooks = {
             huxerui::media::Install,
         },
     }

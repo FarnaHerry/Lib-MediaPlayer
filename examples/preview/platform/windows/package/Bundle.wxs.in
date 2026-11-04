@@ -1,14 +1,14 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Bundle Name="MediaPlayer Preview" Manufacturer="org.huxerui.lib.mediaplayer.preview" Version="@HUXERUI_WINDOWS_PROJECT_VERSION@"
+  <Bundle Name="Media Preview" Manufacturer="org.huxerui.lib.media.preview" Version="@HUXERUI_WINDOWS_PROJECT_VERSION@"
           UpgradeCode="@HUXERUI_WINDOWS_BUNDLE_UPGRADE_CODE@"
           IconSourceFile="!(bindpath.Project)\app.ico">
-    <BootstrapperApplication SourceFile="!(bindpath.Installer)\example_mediaplayer-Installer.exe">
+    <BootstrapperApplication SourceFile="!(bindpath.Installer)\example_media-Installer.exe">
       <PayloadGroupRef Id="HuxerUIInstallerPayloads" />
     </BootstrapperApplication>
-    <Variable Name="InstallFolder" Type="formatted" Value="[ProgramFiles64Folder]MediaPlayer Preview" />
+    <Variable Name="InstallFolder" Type="formatted" Value="[ProgramFiles64Folder]Media Preview" />
     <Variable Name="CreateDesktopShortcut" Type="numeric" Value="0" />
     <Chain>
-      <MsiPackage SourceFile="!(bindpath.Package)\example_mediaplayer.msi">
+      <MsiPackage SourceFile="!(bindpath.Package)\example_media.msi">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
         <MsiProperty Name="CREATE_DESKTOP_SHORTCUT" Value="[CreateDesktopShortcut]" />
       </MsiPackage>

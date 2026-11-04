@@ -1,5 +1,5 @@
-PRODUCT_NAME = MediaPlayer Preview
-PRODUCT_BUNDLE_IDENTIFIER = org.huxerui.lib.mediaplayer.preview
+PRODUCT_NAME = Media Preview
+PRODUCT_BUNDLE_IDENTIFIER = org.huxerui.lib.media.preview
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 IPHONEOS_DEPLOYMENT_TARGET = 15.0
@@ -12,7 +12,7 @@ ENABLE_USER_SCRIPT_SANDBOXING = NO
 
 HUXERUI_PROJECT_ROOT = $(PROJECT_DIR)/../..
 HUXERUI_CORE_BUILD_DIR = $(DERIVED_FILE_DIR)/huxerui-core
-HUXERUI_LINK_OPTIONS_FILE = $(HUXERUI_CORE_BUILD_DIR)/huxerui-ios/example_mediaplayer/link.rsp
+HUXERUI_LINK_OPTIONS_FILE = $(HUXERUI_CORE_BUILD_DIR)/huxerui-ios/example_media/link.rsp
 HEADER_SEARCH_PATHS = $(inherited) "$(HUXERUI_HOME)/include"
 OTHER_LDFLAGS = $(inherited) @"$(HUXERUI_LINK_OPTIONS_FILE)"
 

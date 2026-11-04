@@ -26,8 +26,8 @@ function(huxerui_configure_linux_project_package target_name install_component)
             COMPONENT "${install_component}"
     )
     install(FILES
-            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/package/example_mediaplayer.desktop"
-            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/package/example_mediaplayer.svg"
+            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/package/example_media.desktop"
+            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/package/example_media.svg"
             DESTINATION .
             COMPONENT "${install_component}"
     )

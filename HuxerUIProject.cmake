@@ -8,21 +8,17 @@ if (HUXERUI_PROJECT_PLAN_OUTPUT)
 {
   "schema": 1,
   "kind": "library",
-  "name": "Lib-MediaPlayer",
-  "id": "org.huxerui.lib.mediaplayer",
-  "target": "huxerui_mediaplayer",
+  "name": "Lib-Media",
+  "id": "org.huxerui.lib.media",
+  "target": "huxerui_media",
   "namespace": "huxerui::media",
-  "publicTarget": "HuxerUI::MediaPlayer"
+  "publicTarget": "HuxerUI::Media"
 }
 ]=])
 endif ()
 
 if (HUXERUI_PROJECT_PLAN_ONLY)
     return()
-endif ()
-
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment target" FORCE)
 endif ()
 
 if (NOT HUXERUI_LIBRARY_GRAPH_ONLY)

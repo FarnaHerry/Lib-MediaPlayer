@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(example_mediaplayer VERSION 0.1.0 LANGUAGES NONE)
+# CMake initializes Apple deployment defaults during the first project() call.
+# Explicit settings and toolchains retain ownership of their target platform.
+if (CMAKE_HOST_APPLE AND (NOT CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        AND NOT CMAKE_TOOLCHAIN_FILE AND "$ENV{CMAKE_TOOLCHAIN_FILE}" STREQUAL ""
+        AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND "$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment target")
+endif ()
+
+project(example_media VERSION 0.1.0 LANGUAGES NONE)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/HuxerUIProject.cmake")
 if (HUXERUI_PROJECT_PLAN_ONLY)
@@ -22,7 +30,7 @@ if (NOT HUXERUI_LIBRARY_GRAPH_ONLY)
     endif ()
 endif ()
 
-huxerui_add_app(example_mediaplayer
+huxerui_add_app(example_media
         SOURCES
             ${APP_SOURCE_FILES}
         RESOURCES
@@ -31,14 +39,14 @@ huxerui_add_app(example_mediaplayer
             app
         ${HUXERUI_APP_RESOURCE_OUTPUT_ARGUMENTS}
         BUNDLE_NAME
-            "MediaPlayer Preview"
+            "Media Preview"
         BUNDLE_IDENTIFIER
-            "org.huxerui.lib.mediaplayer.preview"
+            "org.huxerui.lib.media.preview"
 )
 
-huxerui_configure_project_app(example_mediaplayer)
+huxerui_configure_project_app(example_media)
 
-huxerui_use_library(example_mediaplayer
-        TARGET HuxerUI::MediaPlayer
+huxerui_use_library(example_media
+        TARGET HuxerUI::Media
         PATH "${CMAKE_CURRENT_SOURCE_DIR}/../.."
 )

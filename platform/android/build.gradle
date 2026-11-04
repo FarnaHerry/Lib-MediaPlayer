@@ -12,7 +12,7 @@ dependencies {
 }
 
 android {
-    namespace = "org.huxerui.lib.mediaplayer"
+    namespace = "org.huxerui.lib.media"
     compileSdk = 36
 
     defaultConfig {

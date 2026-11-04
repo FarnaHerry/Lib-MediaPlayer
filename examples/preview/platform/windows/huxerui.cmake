@@ -39,13 +39,13 @@ function(huxerui_configure_windows_project_package target_name install_component
 
     string(UUID HUXERUI_WINDOWS_MSI_UPGRADE_CODE
             NAMESPACE 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-            NAME "org.huxerui.lib.mediaplayer.preview.msi"
+            NAME "org.huxerui.lib.media.preview.msi"
             TYPE SHA1
             UPPER
     )
     string(UUID HUXERUI_WINDOWS_BUNDLE_UPGRADE_CODE
             NAMESPACE 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-            NAME "org.huxerui.lib.mediaplayer.preview.bundle"
+            NAME "org.huxerui.lib.media.preview.bundle"
             TYPE SHA1
             UPPER
     )
@@ -82,10 +82,10 @@ function(huxerui_configure_windows_project_package target_name install_component
                 "${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/$<CONFIG>/installer.json"
     )
     set_target_properties(${target_name}_installer PROPERTIES
-            OUTPUT_NAME "example_mediaplayer-Installer"
+            OUTPUT_NAME "example_media-Installer"
     )
     file(GENERATE
             OUTPUT "${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/$<CONFIG>/package.json"
-            CONTENT "{\n  \"schema\": 1,\n  \"name\": \"MediaPlayer Preview\",\n  \"target\": \"example_mediaplayer\",\n  \"version\": \"${PROJECT_VERSION}\",\n  \"installComponent\": \"${install_component}\",\n  \"packageSource\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/Package.wxs\",\n  \"bundleSource\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/Bundle.wxs\",\n  \"installerPlan\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/$<CONFIG>/installer.json\"\n}\n"
+            CONTENT "{\n  \"schema\": 1,\n  \"name\": \"Media Preview\",\n  \"target\": \"example_media\",\n  \"version\": \"${PROJECT_VERSION}\",\n  \"installComponent\": \"${install_component}\",\n  \"packageSource\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/Package.wxs\",\n  \"bundleSource\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/Bundle.wxs\",\n  \"installerPlan\": \"${HUXERUI_WINDOWS_PACKAGE_DIRECTORY}/$<CONFIG>/installer.json\"\n}\n"
     )
 endfunction()
