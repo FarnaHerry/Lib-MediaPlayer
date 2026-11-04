@@ -1,5 +1,5 @@
 #include <huxerui/windows/platform_registry.h>
-#include <huxerui/app.h>
+#include <huxerui/window.h>
 
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -546,10 +546,10 @@ windows::PlatformViewFactory<VideoSurfaceProperties, VideoWindow, MediaPlayer> C
   };
 }
 
-void InstallPlatform(ApplicationContext& root) {
-  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(
+void InstallPlatform(ApplicationContext& context) {
+  context.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(
       player_type, [](UiWindow&) -> std::shared_ptr<NativePlayer> { return CreateWindowsPlayer(); });
-  root.RegisterPlatformView<VideoSurfaceProperties, MediaPlayer>(video_type, CreateWindowsVideoFactory());
+  context.RegisterPlatformView<VideoSurfaceProperties, MediaPlayer>(video_type, CreateWindowsVideoFactory());
 }
 
 } // namespace huxerui::media::detail

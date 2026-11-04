@@ -4,21 +4,21 @@
 
 namespace huxerui::media::detail {
 
-void InstallPlatform(ApplicationContext& root) {
+void InstallPlatform(ApplicationContext& context) {
   android::JavaPlatformModuleFactory<std::shared_ptr<PlatformChannel>> cache;
-  cache.class_name = "org.huxerui.lib.mediaplayer.NativeHttpCache$Factory";
+  cache.class_name = "org.huxerui.lib.media.NativeHttpCache$Factory";
   cache.create = [](PlatformChannel channel) { return std::make_shared<PlatformChannel>(std::move(channel)); };
-  root.RegisterPlatformModule<std::shared_ptr<PlatformChannel>>("media/HttpCache", std::move(cache));
+  context.RegisterPlatformModule<std::shared_ptr<PlatformChannel>>("media/HttpCache", std::move(cache));
   android::JavaPlatformModuleFactory<std::shared_ptr<NativePlayer>> module;
-  module.class_name = "org.huxerui.lib.mediaplayer.NativeMediaPlayer$Factory";
+  module.class_name = "org.huxerui.lib.media.NativeMediaPlayer$Factory";
   module.create = [](PlatformChannel channel) -> std::shared_ptr<NativePlayer> {
     auto player = std::make_shared<ChannelPlayer>(std::move(channel));
     player->Connect();
     return player;
   };
-  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, std::move(module));
+  context.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, std::move(module));
   android::JavaPlatformViewFactory<EncodedVideoProperties, MediaPlayer> view{
-      .class_name = "org.huxerui.lib.mediaplayer.NativeVideoSurface$Factory",
+      .class_name = "org.huxerui.lib.media.NativeVideoSurface$Factory",
       .connect =
           [](const MediaPlayer& player, PlatformChannel channel) {
             auto current = std::make_shared<std::weak_ptr<NativePlayer>>();
@@ -32,7 +32,7 @@ void InstallPlatform(ApplicationContext& root) {
           },
       .disconnect = [](const MediaPlayer& player) { PlayerAccess::Unbind(player); },
   };
-  root.RegisterPlatformView<EncodedVideoProperties, MediaPlayer>(video_type, std::move(view));
+  context.RegisterPlatformView<EncodedVideoProperties, MediaPlayer>(video_type, std::move(view));
 }
 
 } // namespace huxerui::media::detail

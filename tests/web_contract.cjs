@@ -35,7 +35,7 @@ class Video extends EventTarget {
 global.document = {createElement: name => { assert.equal(name, "video"); return new Video(); }};
 const revoke = URL.revokeObjectURL;
 URL.revokeObjectURL = url => { revoked.push(url); revoke(url); };
-vm.runInThisContext(fs.readFileSync(path.join(__dirname, "../platform/web/mediaplayer.js"), "utf8"));
+vm.runInThisContext(fs.readFileSync(path.join(__dirname, "../platform/web/media.js"), "utf8"));
 const P = Module.HuxerUI.PlatformPayload;
 const events = [];
 const bundle = Module.createMediaPlayerBundle();

@@ -3,7 +3,7 @@
 #include <limits>
 
 #include <huxerui/linux/external_texture.h>
-#include <huxerui/app.h>
+#include <huxerui/window.h>
 
 #include "detail/mediaplayer_internal.h"
 #include "detail/video_geometry.h"
@@ -237,8 +237,8 @@ private:
 
 } // namespace
 
-void InstallPlatform(ApplicationContext& root) {
-  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(
+void InstallPlatform(ApplicationContext& context) {
+  context.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(
       player_type, [](UiWindow&) -> std::shared_ptr<NativePlayer> { return std::make_shared<LinuxPlayer>(); });
 }
 

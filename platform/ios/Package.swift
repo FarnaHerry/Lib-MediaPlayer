@@ -3,17 +3,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "Lib-MediaPlayer",
+    name: "Lib-Media",
     platforms: [
         .iOS(.v15),
     ],
     products: [
         .library(
-            name: "MediaPlayer",
-            targets: ["MediaPlayer"]
+            name: "Media",
+            targets: ["Media"]
         ),
     ],
     targets: [
-        .target(name: "MediaPlayer"),
+        .target(
+            name: "Media",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("QuartzCore"),
+                .linkedFramework("CoreMedia"),
+            ]
+        ),
     ]
 )

@@ -1,4 +1,4 @@
-package org.huxerui.lib.mediaplayer;
+package org.huxerui.lib.media;
 
 import android.content.Context;
 import androidx.media3.database.StandaloneDatabaseProvider;

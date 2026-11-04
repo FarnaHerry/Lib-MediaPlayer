@@ -1,4 +1,4 @@
-package org.huxerui.lib.mediaplayer.preview;
+package org.huxerui.lib.media.preview;
 
 import org.huxerui.HuxerUIActivity;
 

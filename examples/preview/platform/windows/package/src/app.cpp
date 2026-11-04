@@ -56,7 +56,7 @@ View BrandPanel(const ThemeSpec& theme) {
     Column {
       Text(installer_strings::application_setup)
           .Style(TextStyle{Font::System(12.0F).WithWeight(FontWeight::SemiBold), secondary_text}),
-      Text("MediaPlayer Preview")
+      Text("Media Preview")
           .Style(TextStyle{Font::System(28.0F).WithWeight(FontWeight::SemiBold), theme.colors.on_primary}),
       Text(installer_strings::guided_setup)
           .Style(TextStyle{Font::System(theme.typography.body_medium), secondary_text}),
@@ -390,11 +390,11 @@ const Application application{
     InstallerPage,
     {
         .window = {
-            .title = "MediaPlayer Preview",
+            .title = "Media Preview",
             .initial_size = {780.0F, 500.0F},
             .minimum_size = Size{720.0F, 460.0F},
         },
         .show_debug_overlay = false,
-        .application_hooks = {InstallInstallerSession},
+        .window_hooks = {InstallInstallerSession},
     },
 };

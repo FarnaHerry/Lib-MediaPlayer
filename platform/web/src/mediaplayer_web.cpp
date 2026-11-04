@@ -43,8 +43,8 @@ struct WebVideo {
 
 } // namespace
 
-void InstallPlatform(ApplicationContext& root) {
-  root.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, [](UiWindow& adapter) {
+void InstallPlatform(ApplicationContext& context) {
+  context.RegisterPlatformModule<std::shared_ptr<NativePlayer>>(player_type, [](UiWindow& ui_window) {
     auto bundle = val::module_property("createMediaPlayerBundle")();
     web::JavaScriptPlatformModuleFactory<std::shared_ptr<NativePlayer>> factory{
         .factory = bundle["factory"],
@@ -54,7 +54,7 @@ void InstallPlatform(ApplicationContext& root) {
           return player;
         },
     };
-    return factory(adapter);
+    return factory(ui_window);
   });
   web::PlatformViewFactory<VideoSurfaceProperties, WebVideo, MediaPlayer> factory{
       .create =
@@ -89,7 +89,7 @@ void InstallPlatform(ApplicationContext& root) {
           },
       .disconnect = [](WebVideo&, const MediaPlayer& player) { PlayerAccess::Unbind(player); },
   };
-  root.RegisterPlatformView<VideoSurfaceProperties, MediaPlayer>(video_type, std::move(factory));
+  context.RegisterPlatformView<VideoSurfaceProperties, MediaPlayer>(video_type, std::move(factory));
 }
 
 } // namespace huxerui::media::detail

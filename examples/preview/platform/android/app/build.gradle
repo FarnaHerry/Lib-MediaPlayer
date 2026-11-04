@@ -47,16 +47,16 @@ android {
         buildConfig = true
     }
 
-    namespace = "org.huxerui.lib.mediaplayer.preview"
+    namespace = "org.huxerui.lib.media.preview"
     compileSdk = huxeruiCompileSdk
     ndkVersion = huxeruiNdkVersion
 
     defaultConfig {
-        applicationId = "org.huxerui.lib.mediaplayer.preview"
+        applicationId = "org.huxerui.lib.media.preview"
         minSdk = huxeruiMinSdk
         targetSdk = huxeruiTargetSdk
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
 
         externalNativeBuild {
             cmake {

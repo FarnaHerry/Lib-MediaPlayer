@@ -1,12 +1,37 @@
-# Lib-MediaPlayer
+# Lib-Media
 
-This downstream fork maintains application fixes on `farna/main`, including Android prefetch budgets, muted-preview audio focus, streaming cache ownership and first-frame presentation. The official baseline is tracked through `upstream/main` from `HuxerUI/Lib-MediaPlayer`. Consumers should pin a validated commit and use matching C++ and Android Java revisions.
+Media capabilities for [HuxerUI](https://github.com/HuxerUI/HuxerUI), maintained in
+[HuxerUI/Lib-Media](https://github.com/HuxerUI/Lib-Media).
 
-Native audio and video playback for HuxerUI. The public API is in
-[`huxerui/mediaplayer.h`](include/huxerui/mediaplayer.h), under `huxerui::media`.
+This downstream fork maintains application fixes on `farna/main`, including Android prefetch budgets, muted-preview audio focus, streaming cache ownership and first-frame presentation. The official baseline is tracked through `upstream/main` from `HuxerUI/Lib-Media`. Consumers should pin a validated commit and use matching C++ and Android Java revisions.
 
-The player owns playback independently of its optional video surface. The library supplies media state and commands;
-applications compose their own controls.
+The current implementation provides native audio and video playback from files, URLs, and `FileReference` values.
+Its public API is in [`huxerui/mediaplayer.h`](include/huxerui/mediaplayer.h), under `huxerui::media`.
+The player owns playback independently of its optional video surface; applications compose their own controls.
+
+## Scope and planned capabilities
+
+Lib-Media is the shared repository and release unit for the following capabilities. Each capability keeps its own
+public API, lifecycle, and acceptance criteria.
+
+| Capability | Status | Responsibility |
+| --- | --- | --- |
+| MediaPlayer | Implemented | File, URL, and `FileReference` playback through native players, with an optional video surface. |
+| Photo and video library access | Planned — [#125](https://github.com/HuxerUI/HuxerUI/issues/125) | Native selection and saving on Android and iOS, reusing `FileReference` and file streaming. |
+| Decoded-media playback | Planned — [#102](https://github.com/HuxerUI/HuxerUI/issues/102) | PCM output and timestamped video-frame playback, with bounded queues, a playback clock, and A/V synchronization. |
+| Audio/video codecs | Planned — [#20](https://github.com/HuxerUI/HuxerUI/issues/20) | Platform codec discovery, encoding, decoding, and explicit input/output ownership. |
+
+The planned capabilities belong to Lib-Media. The linked issues describe their requirements; their original packaging
+proposals for a separate media library or codecs built into the core SDK are superseded by this library scope.
+These capabilities are not available in the current implementation.
+
+Codec and decoded-playback APIs will share media format, timestamp, and buffer-ownership contracts. Codec operations and
+nonvisual PCM playback must work without a `View`, `Runtime`, or window. Decoded playback will own its queues and timing,
+with `ExternalTexture` presenting the selected video frame. Existing file/URL playback will continue to use native
+players independently of these sessions.
+
+HuxerUI remains responsible for generic file, task, host, and texture facilities. Lib-Media will reuse those public
+contracts without adding media-specific Runtime branches, a plugin framework, or a generic processing graph.
 
 ## Android streaming cache (fork)
 
@@ -19,19 +44,26 @@ active `.exo` files yourself. This cache does not turn a partially watched item 
 
 ## Integration
 
-Use the current HuxerUI SDK with FileReference-capable platform payloads and the current CLI library project format.
-The library uses public SDK APIs only; no HuxerUI source changes are required.
+Use the current HuxerUI SDK with `ApplicationContext`, `AppOptions::application_hooks`, `UiWindow` platform factories,
+and FileReference-capable platform payloads, together with the current CLI library project format.
+The current player uses public SDK APIs only; no HuxerUI source changes are required.
 
-For a local checkout, add this after your app target is created:
+Clone the library beside your application:
+
+```sh
+git clone https://github.com/HuxerUI/Lib-Media.git
+```
+
+For that layout, add this after your app target is created. Link the library through `HuxerUI::Media`:
 
 ```cmake
 huxerui_use_library(your_app
-    TARGET HuxerUI::MediaPlayer
-    PATH "${CMAKE_CURRENT_SOURCE_DIR}/../Lib-MediaPlayer"
+    TARGET HuxerUI::Media
+    PATH "${CMAKE_CURRENT_SOURCE_DIR}/../Lib-Media"
 )
 ```
 
-Register `huxerui::media::Install` in your application's `root_hooks`. See the complete
+Register `huxerui::media::Install` in your application's `application_hooks`. See the complete
 [`preview`](examples/preview/src/app.cpp) for application registration, file picking, URL input, progress,
 seeking, volume, looping, and mounting/unmounting video.
 
@@ -150,18 +182,22 @@ and any background playback/audio-session configuration. The preview declares An
 does not change process-wide Apple audio-session categories or add background services. Browser Play may fail with
 `PlaybackNotAllowed`; invoke it directly from a user gesture after the source is ready.
 
-Out of scope: playlists, speed control, track/subtitle selection, DRM, casting, downloads, PiP, system media controls,
-background services, and raw decoded frame/PCM access.
+The current player does not provide playlists, speed control, track/subtitle selection, DRM, casting, downloads, PiP,
+system media controls, background services, or raw decoded frame/PCM access. Planned codec and decoded-playback APIs
+are described under [Scope and planned capabilities](#scope-and-planned-capabilities).
 
 ## Build and validation
 
 Platform shells are generated with `huxerui platform add`. The library keeps iOS and macOS adapters in
 `platform/ios/src` and `platform/macos/src` respectively. Their Objective-C++ implementations are compiled into the
-CMake library target; the generated iOS Swift package remains the CLI's native-package integration point.
+CMake library target. The iOS Swift package supplies the native package integration and declares the AVFoundation,
+QuartzCore, and CoreMedia frameworks required by the final application link.
 
 From `examples/preview`, with the corresponding HuxerUI SDK/toolchain installed:
 
 ```sh
+huxerui build macos --profile debug
+huxerui build ios --profile debug
 huxerui build windows --profile debug
 huxerui build android --profile debug
 huxerui build web --profile debug
@@ -173,7 +209,7 @@ project; use the CLI's `--java-home` option if the system Java is different.
 From the library root, in a configured native compiler environment:
 
 ```sh
-cmake -G Ninja -S . -B build/tests -DHUXERUI_HOME=/path/to/sdk -DHUXERUI_MEDIAPLAYER_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake -G Ninja -S . -B build/tests -DHUXERUI_HOME=/path/to/sdk -DHUXERUI_MEDIA_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/tests
 ctest --test-dir build/tests --output-on-failure
 ```
@@ -185,7 +221,7 @@ with real SDK payloads and a simulated media element. These do not replace brows
 
 Windows also tests fractional-pixel video cropping across fit modes, alignments, and output sizes. To exercise the
 production video backend and window factory against a local video, run
-`build/tests/tests/mediaplayer_windows_video.exe /path/to/video.mp4` after building the tests. This muted test uses an
+`build/tests/tests/media_windows_video.exe /path/to/video.mp4` after building the tests. This muted test uses an
 off-screen window, checks native frame transfer/presentation after resizing, and waits for natural completion. It reads
 the supplied file without modifying or copying it; use a short clip (under 20 seconds).
 

@@ -3,7 +3,7 @@
 /// @file
 /// @brief Native audio/video playback, observable state, and an optional video view for HuxerUI.
 ///
-/// Include <huxerui/mediaplayer.h> and link HuxerUI::MediaPlayer. Register Install() through the application's
+/// Include <huxerui/mediaplayer.h> and link HuxerUI::Media. Register Install() through the application's
 /// application hooks before creating a session with UseMediaPlayer(). Applications own playback controls and platform
 /// permissions; supported codecs and network protocols depend on the native backend.
 
@@ -485,11 +485,11 @@ struct VideoSurfaceProperties {
 /// @endcode
 huxerui::View VideoSurface(MediaPlayer player, VideoSurfaceProperties properties = {});
 
-/// @brief Registers this platform's media player and video output integration in an application root.
+/// @brief Registers this platform's media player and video output integration for an application.
 ///
-/// Add this function once to AppOptions::application_hooks for each root that uses the library. Do not call it during ordinary
-/// recomposition. Installation does not create a playback session, load media, or grant operating-system permissions.
-/// @param root Root receiving the library's platform registrations, supplied by the application hook.
+/// Add this function once to AppOptions::application_hooks for each application that uses the library. Do not call it
+/// during ordinary recomposition. Installation does not create a playback session, load media, or grant permissions.
+/// @param context Application context receiving the library's platform registrations during installation.
 /// @code{.cpp}
 /// // App is the application's root View function.
 /// const huxerui::Application application{
@@ -497,8 +497,7 @@ huxerui::View VideoSurface(MediaPlayer player, VideoSurfaceProperties properties
 ///     {.application_hooks = {huxerui::media::Install}},
 /// };
 /// @endcode
-void Install(huxerui::ApplicationContext& root);
-
+void Install(huxerui::ApplicationContext& context);
 /// Clear cached Android HTTP spans through the cache owner. Other adapters do nothing.
 /// Invoke on the application UI thread after Install; the operation uses the platform command channel.
 void ClearHttpCache(std::string directory);

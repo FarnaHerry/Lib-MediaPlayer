@@ -1,4 +1,4 @@
-package org.huxerui.lib.mediaplayer;
+package org.huxerui.lib.media;
 
 import android.content.Context;
 import android.net.Uri;

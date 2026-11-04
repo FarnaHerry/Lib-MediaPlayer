@@ -17,4 +17,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Lib-MediaPlayer"
+rootProject.name = "Lib-Media"

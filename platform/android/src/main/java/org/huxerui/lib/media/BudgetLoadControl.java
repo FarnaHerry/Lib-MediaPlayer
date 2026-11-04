@@ -1,4 +1,4 @@
-package org.huxerui.lib.mediaplayer;
+package org.huxerui.lib.media;
 
 import androidx.media3.exoplayer.DefaultLoadControl;
 

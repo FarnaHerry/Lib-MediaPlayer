@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Media Preview
+Exec=example_media
+Icon=example_media
+Categories=Utility;
+Terminal=false
