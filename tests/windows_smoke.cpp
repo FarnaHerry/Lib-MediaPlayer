@@ -62,9 +62,8 @@ int main() {
       if (progress.position.count() > 0.1)
         progressed = true;
     });
-    static_cast<void>(player.SetMuted(true));
-    static_cast<void>(player.Load(MediaSource(huxerui::File(file.u8string()))));
-    static_cast<void>(player.Play());
+    if (!player.SetMuted(true) || !player.Load(MediaSource(huxerui::File(file.u8string()))) || !player.Play())
+      throw std::runtime_error("Windows initial playback setup was rejected");
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
     while (!ended && !failed && std::chrono::steady_clock::now() < deadline) {
       MSG message;

@@ -1,4 +1,5 @@
 #include <huxerui/mediaplayer.h>
+#include "detail/media_library.h"
 
 #include <algorithm>
 #include <cmath>
@@ -546,6 +547,7 @@ MediaPlayer UseMediaPlayer() {
 
 void Install(ApplicationContext& context) {
   detail::InstallPlatform(context);
+  detail::InstallMediaLibrary(context);
 }
 
 #if !defined(__linux__) || defined(__ANDROID__)

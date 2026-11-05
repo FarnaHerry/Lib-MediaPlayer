@@ -107,6 +107,9 @@ endif ()
 
 if (APPLE)
     target_link_libraries(huxerui_media PRIVATE "-framework AVFoundation" "-framework QuartzCore" "-framework CoreMedia")
+    if (IOS)
+        target_link_libraries(huxerui_media PRIVATE "-framework Photos" "-framework PhotosUI" "-framework UniformTypeIdentifiers")
+    endif ()
 endif ()
 
 option(HUXERUI_MEDIA_BUILD_TESTS "Build Media contract tests" OFF)

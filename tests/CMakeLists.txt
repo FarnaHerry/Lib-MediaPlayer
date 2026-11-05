@@ -4,6 +4,12 @@ target_compile_features(media_contract_tests PRIVATE cxx_std_20)
 target_include_directories(media_contract_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 add_test(NAME media_contract COMMAND media_contract_tests)
 
+add_executable(media_library_contract_tests library_contract.cpp)
+target_link_libraries(media_library_contract_tests PRIVATE huxerui_media HuxerUI::huxerui_static)
+target_compile_features(media_library_contract_tests PRIVATE cxx_std_20)
+target_include_directories(media_library_contract_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+add_test(NAME media_library_contract COMMAND media_library_contract_tests)
+
 find_program(MEDIA_NODE_EXECUTABLE node)
 if (MEDIA_NODE_EXECUTABLE AND EXISTS "${HUXERUI_HOME}/lib/cmake/HuxerUI/HuxerUIWebPlatformRegistry.js")
     add_test(NAME media_web_contract

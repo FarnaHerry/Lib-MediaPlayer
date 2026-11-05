@@ -1,37 +1,59 @@
 # Lib-Media
 
-Media capabilities for [HuxerUI](https://github.com/HuxerUI/HuxerUI), maintained in
-[HuxerUI/Lib-Media](https://github.com/HuxerUI/Lib-Media).
+Lib-Media is the media library for [HuxerUI](https://github.com/HuxerUI/HuxerUI). It brings media playback, native
+image/video selection, and saving to the system photo library into one C++ library, with decoded-media playback and
+codecs planned in the same repository.
+
+Applications link **`HuxerUI::Media`**, use APIs in **`huxerui::media`**, and register **`Install`** once. Each capability
+has its own handle and lifecycle, so an application can use playback, selection, or saving independently. Platform
+adapters reuse native media services and the public HuxerUI SDK's file, task, window, and rendering facilities.
 
 This downstream fork maintains application fixes on `farna/main`, including Android prefetch budgets, muted-preview audio focus, streaming cache ownership and first-frame presentation. The official baseline is tracked through `upstream/main` from `HuxerUI/Lib-Media`. Consumers should pin a validated commit and use matching C++ and Android Java revisions.
 
-The current implementation provides native audio and video playback from files, URLs, and `FileReference` values.
-Its public API is in [`huxerui/mediaplayer.h`](include/huxerui/mediaplayer.h), under `huxerui::media`.
-The player owns playback independently of its optional video surface; applications compose their own controls.
+Repository: [HuxerUI/Lib-Media](https://github.com/HuxerUI/Lib-Media).
 
-## Scope and planned capabilities
+- [Capabilities](#capabilities)
+- [Platform support](#platform-support)
+- [Integration](#integration)
+- [Media playback](#media-playback)
+- [Media selection and saving](#media-selection-and-saving)
+- [Preview, builds, and validation](#preview-builds-and-validation)
+- [Repository layout](#repository-layout)
+- [Roadmap](#roadmap)
 
-Lib-Media is the shared repository and release unit for the following capabilities. Each capability keeps its own
-public API, lifecycle, and acceptance criteria.
+## Capabilities
 
-| Capability | Status | Responsibility |
+| Capability | Current status | Public entry points |
 | --- | --- | --- |
-| MediaPlayer | Implemented | File, URL, and `FileReference` playback through native players, with an optional video surface. |
-| Photo and video library access | Planned — [#125](https://github.com/HuxerUI/HuxerUI/issues/125) | Native selection and saving on Android and iOS, reusing `FileReference` and file streaming. |
-| Decoded-media playback | Planned — [#102](https://github.com/HuxerUI/HuxerUI/issues/102) | PCM output and timestamped video-frame playback, with bounded queues, a playback clock, and A/V synchronization. |
-| Audio/video codecs | Planned — [#20](https://github.com/HuxerUI/HuxerUI/issues/20) | Platform codec discovery, encoding, decoding, and explicit input/output ownership. |
+| Audio/video playback | Available on Android, iOS, macOS, Windows, Linux, and Web | `UseMediaPlayer()`, `MediaSource`, `VideoSurface()` in [`mediaplayer.h`](include/huxerui/mediaplayer.h) |
+| Native image/video selection | Available on Android and iOS | `UseMediaPicker()`, `MediaPickerOptions` in [`medialibrary.h`](include/huxerui/medialibrary.h) |
+| Save images/videos to the system library | Available on Android and iOS | `UseMediaLibrary()`, `SaveImageAsync()`, `SaveVideoAsync()` in [`medialibrary.h`](include/huxerui/medialibrary.h) |
+| Decoded-media playback | Planned — [#102](https://github.com/HuxerUI/HuxerUI/issues/102) | PCM output and timestamped video-frame playback; no public API yet |
+| Audio/video codecs | Planned — [#20](https://github.com/HuxerUI/HuxerUI/issues/20) | Codec discovery, encoding, and decoding; no public API yet |
 
-The planned capabilities belong to Lib-Media. The linked issues describe their requirements; their original packaging
-proposals for a separate media library or codecs built into the core SDK are superseded by this library scope.
-These capabilities are not available in the current implementation.
+Native selection and saving implement [#125](https://github.com/HuxerUI/HuxerUI/issues/125). Selected media is returned as
+SDK `FileReference` values, which can be retained for reading, imported to local files, or passed to `MediaSource` for
+playback of supported audio/video content. Saving takes a readable local `File` and creates a new system-library asset.
 
-Codec and decoded-playback APIs will share media format, timestamp, and buffer-ownership contracts. Codec operations and
-nonvisual PCM playback must work without a `View`, `Runtime`, or window. Decoded playback will own its queues and timing,
-with `ExternalTexture` presenting the selected video frame. Existing file/URL playback will continue to use native
-players independently of these sessions.
+## Platform support
 
-HuxerUI remains responsible for generic file, task, host, and texture facilities. Lib-Media will reuse those public
-contracts without adding media-specific Runtime branches, a plugin framework, or a generic processing graph.
+| Platform | Playback backend / video output | Native selection | Saving |
+| --- | --- | --- | --- |
+| Android | Media3 ExoPlayer / TextureView | System Photo Picker; legacy `ACTION_PICK` gallery fallback | MediaStore on Android 10+ |
+| iOS | AVFoundation / AVPlayerLayer | PHPicker on iOS 15+ | Photos add-only access on iOS 15+ |
+| macOS | AVFoundation / AVPlayerLayer | Unavailable | Unavailable |
+| Windows | Media Foundation MediaEngine / D3D11 frame server and HWND swap chain | Unavailable | Unavailable |
+| Linux | GtkMediaFile / GdkTexture through HuxerUI ExternalTexture | Unavailable | Unavailable |
+| Web | HTMLMediaElement / native video element | Unavailable | Unavailable |
+
+Android's library minimum is API 23; playback uses Media3 `1.9.3` resolved by Gradle. Linux requires GTK 4.14+ and a
+working GTK media backend. Windows requires Media Foundation components and D3D11-capable hardware. Container, codec,
+and streaming-protocol support follows the native backend. Applications own network permissions, transport-security
+policy, browser CORS/mixed-content rules, and any background playback or audio-session configuration.
+
+Selection and saving have independent availability. On unsupported platforms, their capability query returns
+`max_selection_count = 0` and `can_save = false`; operations return `Unsupported`. Playback remains available through
+its own adapter. See [selection limits and compatibility](#selection-limits-and-compatibility) for Android differences.
 
 ## Android streaming cache (fork)
 
@@ -44,9 +66,10 @@ active `.exo` files yourself. This cache does not turn a partially watched item 
 
 ## Integration
 
-Use the current HuxerUI SDK with `ApplicationContext`, `AppOptions::application_hooks`, `UiWindow` platform factories,
-and FileReference-capable platform payloads, together with the current CLI library project format.
-The current player uses public SDK APIs only; no HuxerUI source changes are required.
+Use a C++20 HuxerUI application and an installed SDK with `ApplicationContext`, `AppOptions::application_hooks`, and
+window platform factories. Native photo-library access additionally requires the SDK's shared `Result` type,
+callback-to-Task bridge, native file-reference factories, and window presentation coordination listed in the
+[SDK integration guide](docs/medialibrary.md#sdk-integration). Lib-Media consumes public SDK interfaces.
 
 Clone the library beside your application:
 
@@ -54,7 +77,7 @@ Clone the library beside your application:
 git clone https://github.com/HuxerUI/Lib-Media.git
 ```
 
-For that layout, add this after your app target is created. Link the library through `HuxerUI::Media`:
+After creating your application target, add the library through the HuxerUI CMake helper:
 
 ```cmake
 huxerui_use_library(your_app
@@ -63,14 +86,41 @@ huxerui_use_library(your_app
 )
 ```
 
-Register `huxerui::media::Install` in your application's `application_hooks`. See the complete
-[`preview`](examples/preview/src/app.cpp) for application registration, file picking, URL input, progress,
-seeking, volume, looping, and mounting/unmounting video.
+Register the installation hook in the application's startup unit. `App` below is your root View function:
 
 ```cpp
 #include <huxerui/huxerui.h>
 #include <huxerui/mediaplayer.h>
+#include <huxerui/medialibrary.h>
 
+huxerui::View App();
+
+const huxerui::Application application{
+    App,
+    {.application_hooks = {huxerui::media::Install}},
+};
+```
+
+The same hook registers playback and photo-library integration. Installation does not create sessions, present UI, or
+request permission. Put the components below in codegen-enabled C++ sources with the corresponding headers included.
+The [preview application](examples/preview/src/app.cpp) provides a complete integration.
+
+### Handles and execution
+
+Obtain `UseMediaPlayer()`, `UseMediaPicker()`, and `UseMediaLibrary()` during composition. Each handle belongs to its
+owning composition scope and UI thread; retaining a copy does not keep its session active after unmount. Start commands
+from UI events or committed Lifecycle work. Run asynchronous operations through a `TaskScope` on the owning UI thread.
+
+Playback commands return `bool` for acceptance and report subsequent native state through snapshots and events.
+Selection and saving return Tasks yielding `MediaLibraryResult<T>`, the SDK's `Result<T, MediaLibraryError>`. Check
+`Succeeded()` before reading `Value()` or `Error()`; reading the wrong branch throws `std::logic_error`.
+
+## Media playback
+
+`MediaPlayer` plays local files, retained `FileReference` values, and HTTP/HTTPS sources. Audio playback needs no video
+view. Mount `VideoSurface(player)` when video output is needed, and compose your own controls.
+
+```cpp
 using namespace huxerui;
 using namespace huxerui::media;
 
@@ -85,128 +135,203 @@ View PlayerPane() {
   return Column {
     VideoSurface(player).With(Frame{.height = 240.0F}),
     Row {
-      Button("Load").OnClick([player] {
-        static_cast<void>(player.Load(MediaSource(File("/absolute/path/to/video.mp4"))));
+      Button("Load").OnClick([player, notice] {
+        if (!player.Load(MediaSource(File("/absolute/path/to/video.mp4")))) notice = "The player is unavailable.";
       }),
-      Button("Play").OnClick([player] { static_cast<void>(player.Play()); }),
-      Button("Pause").OnClick([player] { static_cast<void>(player.Pause()); }),
+      Button("Play").OnClick([player, notice] {
+        if (!player.Play()) notice = "Playback cannot start for the current media.";
+      }),
+      Button("Pause").OnClick([player, notice] {
+        if (!player.Pause()) notice = "Playback cannot be paused right now.";
+      }),
     }.With(Spacing(8.0F)),
     Text(notice),
   }.With(Spacing(12.0F), CrossAlign(CrossAxisAlignment::Stretch));
 }
 ```
 
-Replace the example path with an accessible local file. Use a picker-provided `FileReference` on Web and for external
-documents. A network source is `MediaSource(MediaHttpSource{"https://your-server/video.mp4", {}})`.
-Loading never starts playback automatically.
+Replace the example path with an accessible file. Use `MediaSource(reference)` for picker-provided content, including
+Web files. A network source is `MediaSource(MediaHttpSource{"https://your-server/video.mp4", {}})`.
 
-## Playback contract
+### State, controls, and events
 
-- `UseMediaPlayer()` creates a composition-owned session. Copies of `MediaPlayer` identify the same session, but do not
-  keep it active after its owning composition unmounts. Registering a callback does not create another player.
-- All public operations and callbacks run on the owning UI thread. `Snapshot()` observes state only where it is read
-  during composition; put frequently updating controls in a small composable.
-- Command `bool` results report acceptance, not successful native completion. Disconnected commands return `false` and
-  are not queued. Invalid URLs, malformed headers, nonfinite/negative seek positions, or volume outside `[0, 1]` throw
-  `std::invalid_argument`.
-- `Load()` replaces the source, invalidates old callbacks, cancels pending seeks, and enters `Loading`.
-  `Clear()` releases the source and enters `Empty`. Both preserve volume, mute, and looping preferences.
-- `Play()` records intent during loading. Native playback notifications determine `Playing`; buffering is a separate
-  flag. `Pause()` cancels play intent without clearing the position. Repeated Play/Pause/Clear requests are idempotent.
-- `SeekTo()` requires known seekability and clamps to a known duration. One seek runs at a time; subsequent requests
-  collapse to the latest target. Reported position comes from the backend, not from the requested target or a UI clock.
-- `Ended` is natural completion. Replay and looping require a finite, seekable source. Successful loops do not emit
-  `OnEnded`; unsupported looping reports a nonfatal error and allows normal completion. Failed loop seeks report
-  `SeekFailed` and finish naturally.
-- `Interrupted` preserves play intent while a native interruption prevents playback. Resumption remains subject to
-  platform policy; applications may request Play or Pause explicitly.
-- Fatal errors enter `Failed` and remain in `Snapshot().error`. Retry by calling `Load()` again. Recoverable errors are
-  delivered through `OnError` without populating the fatal-error field.
+- `Load()` replaces the source and enters `Loading`; it does not start playback automatically. `Play()` can record
+  playback intent while loading. `Pause()` preserves the current source and position; `Clear()` releases the source.
+  Loading and clearing preserve volume, mute, and looping preferences.
+- `Snapshot()` observes `MediaPlayerState`, including lifecycle status, progress, seekability, buffering/seeking flags,
+  metadata, preferences, and fatal errors. Time values use `MediaTime`, a duration in double-precision seconds.
+  Missing duration or metadata means unknown; an empty reported buffer list means no buffered ranges are reported.
+- `SeekTo()` requires known seekability and clamps to a known duration. One native seek runs at a time; subsequent
+  requests collapse to the latest target. Position comes from the backend. Looping requires a finite, seekable source.
+- `OnProgress`, `OnEnded`, and `OnError` are composition-bound subscriptions and allow multiple subscribers. Extra
+  arguments are Lifecycle dependencies. Capture stable State handles when no dependencies are supplied.
+  Progress delivers an initial snapshot, samples about every 250 ms, and coalesces significant updates.
+- Fatal errors enter `Failed`; retry by loading a source again. Recoverable errors are delivered through `OnError`.
+  `Ended` denotes natural completion; successful loops do not emit it. Platform interruptions may prevent playback
+  while preserving intent, and resumption remains subject to platform policy.
 
-`MediaPlayerState` includes status, progress, seekability, play intent, buffering/seeking flags, optional track/video
-metadata, preferences, and the current fatal error. Time values are `std::chrono::duration<double>` in seconds.
-Missing duration means unknown or nonfinite; missing buffered ranges means the backend cannot provide them, while an
-empty range list means none are currently reported. Optional audio/video flags are unknown until the backend can tell.
+Disconnected commands return `false` and are not queued. Invalid source arguments, nonfinite/negative seek positions,
+or volume outside `[0, 1]` throw `std::invalid_argument`. Stale callbacks from replaced sources or retired sessions are
+ignored. See [`mediaplayer.h`](include/huxerui/mediaplayer.h) for complete command, state, and subscription contracts.
 
-## Callbacks
+### Video output and current limits
 
-`OnProgress`, `OnEnded`, and `OnError` are composition-bound subscriptions. Multiple independent subscribers are allowed;
-unmounting a subscription removes it. Extra arguments are ordinary HuxerUI Lifecycle dependencies: changing them replaces
-that callback, not the player or source. With no extra dependencies, capture stable State handles rather than changing
-plain values.
+Give `VideoSurface` bounded layout. It provides no controls, autoplay, or fullscreen behavior. A player can have one
+mounted surface; mounting a second is rejected. Removing the surface does not pause playback or release the source,
+while unmounting the player's owning scope disconnects the session. `VideoSurfaceProperties` supports `ImageFit` and
+horizontal/vertical `Start`, `Center`, or `End` alignment; `Stretch` is invalid for content alignment.
+
+The player retains its source while the backend uses it. Android uses native URIs; Web creates object URLs from native
+Files; desktop and Apple adapters use `AsFile()` while retaining the reference. Sources without a native-readable
+location return `Unsupported`. Raw sequential streams and custom stream providers are not accepted.
+
+Custom HTTP headers currently return `Unsupported` on every adapter. Android includes progressive ExoPlayer playback,
+without the optional HLS/DASH modules. Browser playback may require a user gesture and can report `PlaybackNotAllowed`.
+The library does not configure process-wide Apple audio sessions or add background services.
+
+Playlists, speed control, track/subtitle selection, DRM, casting, downloads, PiP, system media controls, and raw decoded
+frame/PCM input are not current playback features. Decoded-media playback and codecs are covered by the [roadmap](#roadmap).
+
+## Media selection and saving
+
+`MediaPicker` opens native image/video selection UI. `MediaLibrary` publishes local images and videos to the system
+photo library. They can be used independently of each other and of `MediaPlayer`.
+
+### Selecting media
+
+`PickAsync()` accepts `MediaPickerOptions` with `Images`, `Videos`, or `ImagesAndVideos` and a positive `selection_limit`.
+Its Task yields `MediaLibraryResult<std::vector<FileReference>>`. User dismissal succeeds with an empty vector; failures
+carry `MediaLibraryError` and are never represented as empty successful selections.
 
 ```cpp
-auto progress = UseState(MediaProgress{});
-player.OnProgress([progress](const MediaProgress& value) { progress = value; });
+using namespace huxerui;
+using namespace huxerui::media;
+
+[[huxerui::composable]]
+View MediaPickerPane() {
+  auto picker = UseMediaPicker();
+  auto tasks = UseTaskScope();
+  auto files = UseState(std::make_shared<std::vector<FileReference>>());
+  auto notice = UseState(std::string("No media selected."));
+
+  return Column {
+    Button("Choose media").OnClick([picker, tasks, files, notice] {
+      tasks.Launch([picker, files, notice]() -> Task<void> {
+        auto result = co_await picker.PickAsync({MediaPickerFilter::ImagesAndVideos, 1});
+        if (!result.Succeeded()) {
+          notice = result.Error().message;
+        } else {
+          auto selected = std::move(result).Value();
+          notice = selected.empty() ? "Selection dismissed." :
+              "Selected " + std::to_string(selected.size()) + " item(s).";
+          if (!selected.empty()) files = std::make_shared<std::vector<FileReference>>(std::move(selected));
+        }
+      });
+    }),
+    Text(notice),
+  }.With(Spacing(8.0F));
+}
 ```
 
-Progress delivers an initial snapshot, normally samples native state about every 250 ms, and publishes significant
-transitions such as load, clear, seek completion, pause, and end. Queued bursts coalesce; this is not a precise timer or
-a video-frame callback. Callback data matches the current snapshot at delivery. Old-source and disconnected callbacks
-are discarded. Ended/error subscriptions do not replay historical events.
+The example retains selected references in composition state; dismissal preserves the previous selection. References
+remain usable after picker dismissal and session unmount. Android retains SDK URI access; iOS copies provider files
+into SDK-owned temporary storage. Keep a reference alive while using its projected path. Metadata may be unknown, and
+references do not promise access after process restart. Prefer `OpenReadAsync()` or `ImportToAsync()` for large videos.
 
-## Video surface
+### Selection limits and compatibility
 
-`VideoSurface(player, properties)` shows video only: it has no controls, autoplay, fullscreen, or transport ownership.
-Provide bounded layout. At most one surface may be mounted for a player; a second binding throws `std::logic_error`.
-Removing the surface does not issue Pause or release the source.
+Query `CapabilitiesAsync()` on either handle when preparing controls. `MediaLibraryCapabilities::CanPick()` derives
+availability from a positive `max_selection_count`; zero means no native selection is available. `can_save` is separate
+and can be true even when selection is unavailable. A capability snapshot does not grant permission or reserve UI.
 
-`VideoSurfaceProperties` reuses `ImageFit` (`Contain`, `Cover`, `Fill`, `None`, `ScaleDown`) and horizontal/vertical
-`Start`, `Center`, or `End` alignment. `Stretch` is not a content alignment and is rejected.
+| Selection path | Behavior and limits |
+| --- | --- |
+| Android system Photo Picker | Preferred on Android 13+, or Android 11/12 with R SDK extension 2+ and an available picker. Images, videos, and mixed selection use the native maximum. |
+| Android legacy `ACTION_PICK` | Opens an installed image or video gallery. Reports `max_selection_count = 1` and accepts single selection only. |
+| iOS PHPicker | Supports images, videos, and mixed selection with the requested positive count limit. |
 
-## Platform adapters and requirements
+On legacy Android, `Images` opens the image gallery and `Videos` opens the video gallery. `ImagesAndVideos` first uses
+the system chooser to offer those two routes and requires handlers for both. A requested media kind can be unavailable
+even when another kind has a handler. No document-picker fallback is implicit, and no vendor-specific mixed-media or
+multi-select extras are assumed.
 
-| Platform | Native backend | Video output | Additional requirement |
-| --- | --- | --- | --- |
-| Windows | Media Foundation MediaEngine | D3D11 frame server and HWND swap chain | Windows media components and D3D11-capable hardware |
-| macOS | AVFoundation | AVPlayerLayer / NSView | macOS SDK; app-owned network policy |
-| iOS | AVFoundation | AVPlayerLayer / UIView | iOS SDK; app-owned audio/session and network policies |
-| Android | AndroidX Media3 ExoPlayer | TextureView | API 23+, Media3 `1.9.3` resolved by Gradle |
-| Linux | GtkMediaFile / GtkMediaStream | GdkTexture through HuxerUI ExternalTexture | GTK 4.14+ and a working GTK media backend/codecs |
-| Web | HTMLMediaElement | Native video element | Browser media codecs, permissions, and playback policy |
+`selection_limit` defaults to one; zero is invalid. Larger limits enable multiple selection only where supported.
+Requests above native capability return `Unsupported` before presentation, and returned types/counts are validated.
+The library does not silently reduce limits or truncate selections. Selection requests no broad photo-library or
+storage-read permission. Applications can explicitly offer the SDK FilePicker as a separate document-selection action.
 
-Container, codec, and streaming-protocol support follows each backend; this is not a bundled FFmpeg codec suite.
-Android currently includes the progressive ExoPlayer backend, not the optional HLS/DASH modules.
+### Saving local files
 
-`FileReference` is retained until the backend stops using the source. Android uses its native URI; Web resolves its
-native File to an object URL without reading the whole file into memory. Desktop/Apple adapters use `AsFile()` while
-retaining the original reference. References without a native-readable location report `Unsupported`; raw sequential
-streams and custom stream providers are not accepted as public media inputs in this version.
+Obtain a handle with `UseMediaLibrary()`. Inside a launched Task, save a readable local `File source` with:
 
-Custom HTTP headers are validated by the API but **currently report `Unsupported` on every adapter**. They are never
-silently ignored, and no adapter adds a fetching proxy or forwards caller headers across redirects. HTTP sources with
-empty headers use the native backend's networking and redirect behavior.
+```cpp
+auto result = co_await library.SaveImageAsync(source);
+if (!result.Succeeded()) {
+  ShowError(result.Error().message);
+}
+```
 
-Applications own Android INTERNET permission, Apple transport-security policy, browser CORS/mixed-content requirements,
-and any background playback/audio-session configuration. The preview declares Android INTERNET permission. The library
-does not change process-wide Apple audio-session categories or add background services. Browser Play may fail with
-`PlaybackNotAllowed`; invoke it directly from a user gesture after the source is ready.
+`ShowError` is an application callback. Use `SaveVideoAsync(source)` for video. Both Tasks yield
+`MediaLibraryResult<void>`: success confirms publication and needs no separate scan/notification. Each save creates
+another asset and preserves the source. Keep its contents readable and unchanged until completion. To save a selected
+reference, first import it to a local temporary file and retain that file until saving completes.
 
-The current player does not provide playlists, speed control, track/subtitle selection, DRM, casting, downloads, PiP,
-system media controls, background services, or raw decoded frame/PCM access. Planned codec and decoded-playback APIs
-are described under [Scope and planned capabilities](#scope-and-planned-capabilities).
+Android 10+ validates the media, streams it into a pending MediaStore entry, and publishes after writing completes;
+no storage permission is requested. iOS requires a nonempty `NSPhotoLibraryAddUsageDescription` in the application's
+Info.plist and requests Photos add-only authorization. Missing configuration returns `Unavailable`; denial returns
+`PermissionDenied`. The preview includes the usage description.
 
-## Build and validation
+### Cancellation and ownership
 
-Platform shells are generated with `huxerui platform add`. The library keeps iOS and macOS adapters in
-`platform/ios/src` and `platform/macos/src` respectively. Their Objective-C++ implementations are compiled into the
-CMake library target. The iOS Swift package supplies the native package integration and declares the AVFoundation,
-QuartzCore, and CoreMedia frameworks required by the final application link.
+Unmount cancels pending native requests and retires the session. A surviving application Task receives `Unavailable`,
+while Task cancellation suppresses delivery. A native picker or permission prompt may remain visible until the system
+closes it. Native selection shares the SDK's window presentation coordination with FilePicker.
 
-From `examples/preview`, with the corresponding HuxerUI SDK/toolchain installed:
+Canceling a save cannot undo committed publication. Android attempts to delete an unfinished pending entry, subject to
+provider cleanup failures. Once an iOS Photos transaction is submitted, it may finish after cancellation; its staged
+source remains retained until completion. Partial selection results are released if materializing any item fails.
+See the [media library guide](docs/medialibrary.md) and [`medialibrary.h`](include/huxerui/medialibrary.h) for details.
+
+## Preview, builds, and validation
+
+The [preview](examples/preview) exercises the library through three tabs:
+
+| Tab | Coverage |
+| --- | --- |
+| Video | Local/reference/URL sources, playback controls, progress, seeking, volume, looping, and video fitting |
+| Music | Audio playback using the same player API without a video surface |
+| Library | Native image/video/mixed selection, capability-aware multi-select, retained references, and publication |
+
+The Library tab disables multi-select when the maximum is below two; otherwise it requests up to three items within
+the native limit. “Save first selection” imports and publishes a retained reference. “Save image” and “Save video” use
+FilePicker explicitly to obtain a source. Switching tabs unmounts the previous session and cancels its pending work.
+
+### Build and run
+
+From `examples/preview`, build a platform supported by the installed SDK and host toolchain:
 
 ```sh
-huxerui build macos --profile debug
-huxerui build ios --profile debug
-huxerui build windows --profile debug
 huxerui build android --profile debug
+huxerui build ios --profile debug
+huxerui build macos --profile debug
+huxerui build windows --profile debug
+huxerui build linux --profile debug
 huxerui build web --profile debug
 ```
 
-Use `huxerui run <platform>` for interactive testing. Android builds require the JDK expected by the generated Gradle
-project; use the CLI's `--java-home` option if the system Java is different.
+Use `huxerui run <platform> --profile debug` for interactive testing. For a connected Android device:
 
-From the library root, in a configured native compiler environment:
+```sh
+huxerui devices android
+huxerui run android --device <device-id> --profile debug --java-home /path/to/jdk
+```
+
+Platform shells follow `huxerui platform add` conventions. Android uses the JDK required by its Gradle project. Apple
+adapters compile into the CMake library; the iOS Swift package declares the frameworks required by the final app link.
+
+### Automated and device checks
+
+From the library root, with a configured native compiler and SDK:
 
 ```sh
 cmake -G Ninja -S . -B build/tests -DHUXERUI_HOME=/path/to/sdk -DHUXERUI_MEDIA_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -214,17 +339,38 @@ cmake --build build/tests
 ctest --test-dir build/tests --output-on-failure
 ```
 
-Tests cover shared state transitions, coalesced seeking/progress, looping, reentrant callbacks, stale-source/attachment
-events, preferences, and surface ownership. Windows adds a real native audio smoke test using a temporary generated WAV
-that is muted and removed afterward. If Node and the SDK Web registry are available, CTest also runs Web adapter tests
-with real SDK payloads and a simulated media element. These do not replace browser/device playback tests.
+Tests cover playback state transitions, coalesced seeking/progress, looping, stale callbacks, preferences, surface
+ownership, and media-library result validation, cancellation, late replies, and session retirement. When Node and the
+SDK Web registry are available, CTest also exercises the Web adapter with simulated media elements.
 
-Windows also tests fractional-pixel video cropping across fit modes, alignments, and output sizes. To exercise the
-production video backend and window factory against a local video, run
-`build/tests/tests/media_windows_video.exe /path/to/video.mp4` after building the tests. This muted test uses an
-off-screen window, checks native frame transfer/presentation after resizing, and waits for natural completion. It reads
-the supplied file without modifying or copying it; use a short clip (under 20 seconds).
+Windows adds native muted audio smoke tests and video geometry tests. To check frame transfer and presentation against
+a real source, run `build/tests/tests/media_windows_video.exe /path/to/video.mp4` with a short clip under 20 seconds.
+It uses an off-screen window, resizes the surface, and waits for natural completion without modifying the source.
 
-Manual acceptance should include local audio/video, a picker reference, HTTPS media, pause/seek/end/loop, a denied or
-unsupported source, replacing media while loading/seeking, and hiding/remounting video without stopping audio. Verify
-video fitting on narrow/wide windows, output on actual hardware, and platform interruptions separately.
+Device acceptance should cover local/reference/HTTPS playback, seek/end/loop, source replacement, fitting, and platform
+interruptions; image/video/mixed selection, native count limits, dismissal, and reading retained references; and
+image/video publication, denied access, invalid sources, and cancellation. Exercise both legacy Android gallery routes
+and the mixed chooser. Automated contract tests do not replace native device or browser verification.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| [`include/huxerui/`](include/huxerui) | Public APIs and their full contracts |
+| [`src/`](src) | Shared session state, validation, and platform routing |
+| [`platform/`](platform) | Native adapters and platform package integration |
+| [`examples/preview/`](examples/preview) | Consumer application for playback and photo-library access |
+| [`tests/`](tests) | Shared contracts, Web adapter checks, and Windows native checks |
+| [`docs/medialibrary.md`](docs/medialibrary.md) | Photo-library integration and lifecycle details |
+
+## Roadmap
+
+Decoded-media playback ([#102](https://github.com/HuxerUI/HuxerUI/issues/102)) will cover PCM output and timestamped
+video-frame presentation, with bounded queues, a playback clock, and A/V synchronization. Audio/video codecs
+([#20](https://github.com/HuxerUI/HuxerUI/issues/20)) will cover platform codec discovery, encoding, decoding, and explicit
+input/output ownership. Both belong to Lib-Media; their APIs are not implemented yet.
+
+The planned APIs will share media format, timestamp, and buffer-ownership contracts. Codec operations and nonvisual PCM
+playback should be usable without a `View`, `Runtime`, or window, with `ExternalTexture` providing video presentation.
+Existing file/URL playback will continue to use native players. HuxerUI remains responsible for general file, task,
+window, and texture facilities; media-specific behavior belongs in this library.
