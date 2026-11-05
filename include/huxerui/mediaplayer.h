@@ -283,8 +283,11 @@ public:
   /// @return True if accepted; false if disconnected, Loading, Failed, or not known to be seekable.
   /// @throws std::invalid_argument If position is negative or nonfinite, even when disconnected.
   /// @throws std::logic_error If called from a different thread.
+  /// The example uses an application-owned State<std::string> named notice for feedback.
   /// @code{.cpp}
-  /// static_cast<void>(player.SeekTo(huxerui::media::MediaTime{30.0}));
+  /// return huxerui::Button("Seek to 30 seconds").OnClick([player, notice] {
+  ///   if (!player.SeekTo(huxerui::media::MediaTime{30.0})) notice = "Seeking is unavailable.";
+  /// });
   /// @endcode
   [[nodiscard]] bool SeekTo(MediaTime position) const;
 
@@ -415,15 +418,21 @@ private:
 /// [[huxerui::composable]]
 /// View PlayerPane() {
 ///   auto player = UseMediaPlayer();
+///   auto notice = UseState(std::string{});
 ///   return Column {
 ///     VideoSurface(player).With(Frame{.height = 240.0F}),
 ///     Row {
-///       Button("Load").OnClick([player] {
-///         static_cast<void>(player.Load(MediaSource(File("/absolute/path/to/video.mp4"))));
+///       Button("Load").OnClick([player, notice] {
+///         if (!player.Load(MediaSource(File("/absolute/path/to/video.mp4")))) notice = "The player is unavailable.";
 ///       }),
-///       Button("Play").OnClick([player] { static_cast<void>(player.Play()); }),
-///       Button("Pause").OnClick([player] { static_cast<void>(player.Pause()); }),
+///       Button("Play").OnClick([player, notice] {
+///         if (!player.Play()) notice = "Playback cannot start for the current media.";
+///       }),
+///       Button("Pause").OnClick([player, notice] {
+///         if (!player.Pause()) notice = "Playback cannot be paused right now.";
+///       }),
 ///     }.With(Spacing(8.0F)),
+///     Text(notice),
 ///   }.With(CrossAlign(CrossAxisAlignment::Stretch));
 /// }
 /// @endcode

@@ -1,10 +1,12 @@
 #include <huxerui/huxerui.h>
 #include <huxerui/mediaplayer.h>
+#include <huxerui/medialibrary.h>
 #include <app_resources.h>
 
 #include <algorithm>
 #include <functional>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
 using namespace huxerui;
@@ -71,7 +73,7 @@ View TransportButton(ImageVariant icon, std::string label, bool enabled, bool pr
 }
 
 [[huxerui::composable]]
-View PlaybackControls(MediaPlayer player) {
+View PlaybackControls(MediaPlayer player, State<std::string> error_message) {
   const auto state = player.Snapshot();
   const auto& colors = UseTheme().colors;
   auto seek_draft = UseState(std::optional<float>{});
@@ -95,26 +97,29 @@ View PlaybackControls(MediaPlayer player) {
         .Range(0.0F, duration)
         .OnStarted([seek_draft](float value) { seek_draft = value; })
         .OnChanged([seek_draft](float value) { seek_draft = value; })
-        .OnCommitted([player, seek_draft](float value) {
-          static_cast<void>(player.SeekTo(MediaTime(value)));
+        .OnCommitted([player, seek_draft, error_message](float value) {
+          if (!player.SeekTo(MediaTime(value))) error_message = "Seeking is unavailable.";
           seek_draft = std::optional<float>{};
         })
         .OnCanceled([seek_draft] { seek_draft = std::optional<float>{}; })
         .With(Enabled{can_seek}, Semantics{.label = "Playback position"}),
     Row {
-      TransportButton(app::images::rewind, "Back 10 seconds", can_seek, false, [player, seek_draft] {
-        static_cast<void>(player.SeekTo(MediaTime(std::max(0.0, player.Snapshot().progress.position.count() - 10.0))));
+      TransportButton(app::images::rewind, "Back 10 seconds", can_seek, false, [player, seek_draft, error_message] {
+        if (!player.SeekTo(MediaTime(std::max(0.0, player.Snapshot().progress.position.count() - 10.0))))
+          error_message = "Seeking is unavailable.";
         seek_draft = std::optional<float>{};
       }),
       TransportButton(state.play_when_ready ? app::images::pause : app::images::play,
-          state.play_when_ready ? "Pause" : "Play", can_play, true, [player] {
-            if (player.Snapshot().play_when_ready) static_cast<void>(player.Pause());
-            else static_cast<void>(player.Play());
+          state.play_when_ready ? "Pause" : "Play", can_play, true, [player, error_message] {
+            if (player.Snapshot().play_when_ready) {
+              if (!player.Pause()) error_message = "Playback cannot be paused right now.";
+            } else if (!player.Play()) error_message = "Playback cannot start for the current media.";
           }),
-      TransportButton(app::images::forward, "Forward 10 seconds", can_seek, false, [player, seek_draft] {
+      TransportButton(app::images::forward, "Forward 10 seconds", can_seek, false, [player, seek_draft, error_message] {
         const auto current = player.Snapshot().progress;
         if (current.duration) {
-          static_cast<void>(player.SeekTo(MediaTime(std::min(current.duration->count(), current.position.count() + 10.0))));
+          if (!player.SeekTo(MediaTime(std::min(current.duration->count(), current.position.count() + 10.0))))
+            error_message = "Seeking is unavailable.";
         }
         seek_draft = std::optional<float>{};
       }),
@@ -122,15 +127,21 @@ View PlaybackControls(MediaPlayer player) {
     Divider(),
     Flow {
       Chip(app::images::repeat, "Repeat", state.looping)
-          .OnChanged([player](bool value) { static_cast<void>(player.SetLooping(value)); }),
+          .OnChanged([player, error_message](bool value) {
+            if (!player.SetLooping(value)) error_message = "Repeat cannot be changed right now.";
+          }),
       Chip(app::images::volume, "Mute", state.muted)
-          .OnChanged([player](bool value) { static_cast<void>(player.SetMuted(value)); }),
+          .OnChanged([player, error_message](bool value) {
+            if (!player.SetMuted(value)) error_message = "Mute cannot be changed right now.";
+          }),
     }.With(Spacing(12.0F), MainAlign(MainAxisAlignment::Center)),
     Row {
       Image(app::images::volume).Tint(colors.on_surface_variant)
           .With(Frame{.width = 20.0F, .height = 20.0F}),
       Slider(static_cast<float>(state.volume))
-          .OnChanged([player](float value) { static_cast<void>(player.SetVolume(value)); })
+          .OnChanged([player, error_message](float value) {
+            if (!player.SetVolume(value)) error_message = "Volume cannot be changed right now.";
+          })
           .With(Grow(), Semantics{.label = "Volume"}),
       Text(std::to_string(static_cast<int>(state.volume * 100)) + "%", TextRole::Label)
           .With(Frame{.width = 40.0F}, Foreground(colors.on_surface_variant)),
@@ -246,7 +257,10 @@ View MediaPage(bool music) {
       SecondaryAction(Button(show_link.Get() ? "Hide link" : "Open link")
           .OnClick([show_link] { show_link = !show_link.Get(); })),
       SecondaryAction(Button("Unload").OnClick([player, source_name, error_message, source_revision] {
-        static_cast<void>(player.Clear());
+        if (!player.Clear()) {
+          error_message = "The current media could not be unloaded.";
+          return;
+        }
         source_name = std::string{};
         error_message = std::string{};
         source_revision += 1;
@@ -255,7 +269,7 @@ View MediaPage(bool music) {
     link_editor,
     Column {
       artwork,
-      PlaybackControls(player).Key(source_revision.Get()),
+      PlaybackControls(player, error_message).Key(source_revision.Get()),
     }.With(Padding(compact ? 16.0F : 24.0F), Spacing(24.0F), CrossAlign(CrossAxisAlignment::Stretch),
         Background(colors.surface_container), CornerRadius(24.0F)),
     error_message->empty() ? View(Column {})
@@ -266,15 +280,128 @@ View MediaPage(bool music) {
 }
 
 [[huxerui::composable]]
+View LibraryPage() {
+  auto picker = UseMediaPicker();
+  auto library = UseMediaLibrary();
+  auto documents = UseService<FilePicker>();
+  auto tasks = UseTaskScope();
+  auto current = UseState(TaskHandle{});
+  auto busy = UseState(false);
+  auto multiple = UseState(false);
+  auto capabilities = UseState(MediaLibraryCapabilities{});
+  auto notice = UseState(std::string("Checking native media support..."));
+  auto selection = UseState(std::make_shared<std::vector<FileReference>>());
+  auto temporary = UseApplication().Directories().temporary_directory;
+  Lifecycle([tasks, picker, capabilities, notice] {
+    auto task = tasks.Launch([picker, capabilities, notice]() -> Task<void> {
+      auto result = co_await picker.CapabilitiesAsync();
+      if (!result.Succeeded()) notice = result.Error().message;
+      else {
+        capabilities = result.Value();
+        if (!capabilities.Get().CanPick()) notice = "The native media picker is unavailable on this device.";
+        else if (capabilities.Get().max_selection_count == 1) {
+          notice = "Choose one photo or video. Multiple selection is unavailable on this device.";
+        }
+        else notice = "Choose photos or videos from your library.";
+      }
+    });
+    return [task] { task.Cancel(); };
+  });
+  const auto multiple_limit = std::min(3u, capabilities.Get().max_selection_count);
+  auto pick = [=](MediaPickerFilter filter) {
+    busy = true;
+    current = tasks.Launch([=]() -> Task<void> {
+      auto result = co_await picker.PickAsync({filter, multiple.Get() ? multiple_limit : 1u});
+      if (!result.Succeeded()) notice = result.Error().message;
+      else {
+        auto chosen = std::move(result).Value();
+        notice = chosen.empty() ? "Selection dismissed." : "Selected " + std::to_string(chosen.size()) + " item(s).";
+        if (!chosen.empty()) selection = std::make_shared<std::vector<FileReference>>(std::move(chosen));
+      }
+      busy = false;
+    });
+  };
+  auto save = [=](bool video, std::optional<FileReference> chosen = {}) {
+    busy = true;
+    current = tasks.Launch([=]() -> Task<void> {
+      try {
+        auto source = chosen ? chosen : co_await documents->OpenFileAsync({
+            .name = video ? "Video" : "Image", .content_types = {video ? "video/*" : "image/*"}});
+        if (!source) { notice = "File selection dismissed."; busy = false; co_return; }
+        auto name = source->Name();
+        for (auto& ch : name) if (ch == '/' || ch == '\\' || ch == ':' || static_cast<unsigned char>(ch) < 32) ch = '_';
+        if (name.empty()) name = video ? "video.mp4" : "image.jpg";
+        const auto id = std::chrono::steady_clock::now().time_since_epoch().count();
+        struct TemporaryFile {
+          File file;
+          ~TemporaryFile() {
+            if (!file.Delete()) std::cerr << "Could not remove temporary media file: " << file.Path() << '\n';
+          }
+        } staged{temporary.Child("media-preview-" + std::to_string(id) + "-" + name)};
+        if (!(co_await source->ImportToAsync(staged.file))) {
+          notice = "The selected file could not be copied.";
+          busy = false;
+          co_return;
+        }
+        auto result = co_await (video ? library.SaveVideoAsync(staged.file) : library.SaveImageAsync(staged.file));
+        if (!result.Succeeded()) notice = result.Error().message;
+        else notice = "Saved to your photo library. The source file was preserved.";
+      } catch (const std::exception& error) { notice = error.what(); }
+      busy = false;
+    });
+  };
+  std::string names;
+  for (const auto& file : *selection.Get()) {
+    if (!names.empty()) names += "\n";
+    names += file.Name();
+  }
+  const bool can_pick = capabilities.Get().CanPick() && !busy.Get();
+  const bool can_save = capabilities.Get().can_save && documents->CanOpenFiles() && !busy.Get();
+  return Column {
+    Text("Photos & videos", TextRole::Title),
+    Button(multiple.Get() ? "Multiple selection (up to " + std::to_string(multiple_limit) + ")" :
+        "Single selection")
+        .OnClick([multiple] { multiple = !multiple.Get(); }).With(Enabled{can_pick && multiple_limit > 1}),
+    Flow {
+      Button("Choose images").OnClick([pick] { pick(MediaPickerFilter::Images); }).With(Enabled{can_pick}),
+      Button("Choose videos").OnClick([pick] { pick(MediaPickerFilter::Videos); }).With(Enabled{can_pick}),
+      Button("Choose both").OnClick([pick] { pick(MediaPickerFilter::ImagesAndVideos); }).With(Enabled{can_pick}),
+    }.With(Spacing(12.0F)),
+    Text(names.empty() ? "No media selected." : names),
+    Button("Save first selection").OnClick([save, selection, notice] {
+      const auto& file = selection.Get()->front();
+      const auto type = file.ContentType().value_or("");
+      if (!type.starts_with("image/") && !type.starts_with("video/")) {
+        notice = "The selected item's media type is unknown. Use Save image or Save video instead.";
+        return;
+      }
+      save(type.starts_with("video/"), file);
+    }).With(Enabled{capabilities.Get().can_save && !busy.Get() && !selection.Get()->empty()}),
+    Text("Save a local file", TextRole::Title),
+    Text("Choose a file to copy into the system photo library. Each save creates a new item.", TextRole::Label),
+    Flow {
+      Button("Save image...").OnClick([save] { save(false); }).With(Enabled{can_save}),
+      Button("Save video...").OnClick([save] { save(true); }).With(Enabled{can_save}),
+      Button("Cancel operation").OnClick([current, busy, notice] {
+        current.Get().Cancel();
+        busy = false;
+        notice = "Operation canceled. A save already committed by the system may still complete.";
+      }).With(Enabled{busy.Get()}),
+    }.With(Spacing(12.0F)),
+    Text(notice),
+  }.With(Spacing(16.0F), CrossAlign(CrossAxisAlignment::Stretch));
+}
+
+[[huxerui::composable]]
 View MediaContent() {
   auto selected = UseState(std::size_t{0});
   const bool compact = UseViewportClass() == ViewportClass::Compact;
   return Column {
     TopAppBar("Media"),
     ScrollView(Column {
-      Text("HUXERUI / PLAYER PREVIEW", TextRole::Label).With(Foreground(UseTheme().colors.on_surface_variant)),
-      Tabs({"Video", "Music"}, selected).OnChanged([selected](std::size_t index) { selected = index; }),
-      MediaPage(selected.Get() == 1).Key(selected.Get()),
+      Text("HUXERUI / MEDIA PREVIEW", TextRole::Label).With(Foreground(UseTheme().colors.on_surface_variant)),
+      Tabs({"Video", "Music", "Library"}, selected).OnChanged([selected](std::size_t index) { selected = index; }),
+      (selected.Get() == 2 ? LibraryPage() : MediaPage(selected.Get() == 1)).Key(selected.Get()),
       Text("Switching pages stops playback and clears the current source.", TextRole::Label)
           .With(Foreground(UseTheme().colors.on_surface_variant)),
     }.With(Frame{.max_width = 1000.0F}, Padding(compact ? 16.0F : 32.0F),

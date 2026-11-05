@@ -111,11 +111,11 @@ int main() {
       Check(f.player == f.player, "Player identity changed");
       Check(!f.player.Play(), "Empty player accepted Play");
       Check(!f.player.SeekTo(MediaTime(0)), "Empty player accepted Seek");
-      Throws<std::invalid_argument>([&] { static_cast<void>(f.player.SetVolume(1.1)); });
+      Throws<std::invalid_argument>([&] { return f.player.SetVolume(1.1); });
       Throws<std::invalid_argument>(
-          [&] { static_cast<void>(f.player.SetVolume(std::numeric_limits<double>::quiet_NaN())); });
-      Throws<std::invalid_argument>([&] { static_cast<void>(f.player.SeekTo(MediaTime(-1))); });
-      Throws<std::invalid_argument>([&] { static_cast<void>(f.player.SeekTo(MediaTime(INFINITY))); });
+          [&] { return f.player.SetVolume(std::numeric_limits<double>::quiet_NaN()); });
+      Throws<std::invalid_argument>([&] { return f.player.SeekTo(MediaTime(-1)); });
+      Throws<std::invalid_argument>([&] { return f.player.SeekTo(MediaTime(INFINITY)); });
       f.Load();
       Check(f.player.Play(), "Loading player rejected Play");
       Check(f.native->plays == 0, "Playback started before readiness");
@@ -223,7 +223,7 @@ int main() {
       f.state->progress_handlers.emplace(1, [&](const MediaProgress& progress) {
         Check(progress == f.player.Snapshot().progress, "Callback and snapshot diverged");
         ++callbacks;
-        static_cast<void>(f.player.Clear());
+        Check(f.player.Clear(), "Clear from a progress callback was rejected");
       });
       int empty_callbacks = 0;
       f.state->progress_handlers.emplace(2, [&](const MediaProgress&) {
@@ -241,7 +241,9 @@ int main() {
       Fixture f;
       f.Ready();
       Check(f.player.Play() && f.player.Play() && f.native->plays == 1, "Repeated Play was not idempotent");
-      f.state->progress_handlers.emplace(1, [&](const MediaProgress&) { static_cast<void>(f.player.Pause()); });
+      f.state->progress_handlers.emplace(1, [&](const MediaProgress&) {
+        Check(f.player.Pause(), "Pause from a progress callback was rejected");
+      });
       f.native->snapshot.progress.position = MediaTime(2);
       f.native->Send(NativeEventKind::Update);
       f.Drain();

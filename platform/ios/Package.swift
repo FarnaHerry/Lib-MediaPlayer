@@ -20,6 +20,9 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("QuartzCore"),
                 .linkedFramework("CoreMedia"),
+                .linkedFramework("Photos"),
+                .linkedFramework("PhotosUI"),
+                .linkedFramework("UniformTypeIdentifiers"),
             ]
         ),
     ]

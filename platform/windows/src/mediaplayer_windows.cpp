@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cmath>
 #include <limits>
+#include <mutex>
 #include <iomanip>
 #include <sstream>
 
@@ -144,7 +145,8 @@ LRESULT CALLBACK VideoProcedure(HWND window, UINT message, WPARAM wparam, LPARAM
 }
 
 void RegisterWindows() {
-  static const bool registered = [] {
+  static std::once_flag registration;
+  std::call_once(registration, [] {
     WNDCLASSW dispatch{};
     dispatch.hInstance = GetModuleHandleW(nullptr);
     dispatch.lpfnWndProc = DispatchProcedure;
@@ -156,9 +158,7 @@ void RegisterWindows() {
     dispatch.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     if (!RegisterClassW(&dispatch) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
       throw std::runtime_error("HuxerUI video registration failed");
-    return true;
-  }();
-  static_cast<void>(registered);
+  });
 }
 
 WindowsPlayer::WindowsPlayer() {
